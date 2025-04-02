@@ -23,7 +23,7 @@
       gap: 10px;
       align-items: flex-start;
     }
-    /* Each word becomes a cell with two rows (stacked vertically) */
+    /* Each word becomes a cell with multiple rows (stacked vertically) */
     .word-cell {
       display: flex;
       flex-direction: column;
@@ -50,14 +50,13 @@
       margin-top: 2px;
       color: #333;
     }
-    /* Component breakdown is shown as a row below the main symbol */
+    /* Component breakdown row styling */
     .components {
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
       margin-top: 10px;
     }
-    /* Style for the breakdown figures (components) */
     .components figure {
       margin: 0;
       text-align: center;
@@ -294,6 +293,34 @@
       return normalized;
     }
 
+    // Recursive function to render breakdown rows.
+    function renderBreakdown(word) {
+      let html = "";
+      const norm = normalizeWord(word);
+      if (compMapping[norm]) {
+        // Render a row for the immediate components.
+        html += `<div class="components">`;
+        compMapping[norm].forEach(comp => {
+          const compCode = getFinalCode(comp);
+          html += `
+            <figure>
+              <img src="bliss_svg_id/${compCode}.svg" alt="${comp}" title="${comp}">
+              <figcaption>
+                ${comp}<br>
+                ID: ${compCode}
+              </figcaption>
+            </figure>
+          `;
+        });
+        html += `</div>`;
+        // Recursively add breakdown rows for each component.
+        compMapping[norm].forEach(comp => {
+          html += renderBreakdown(comp);
+        });
+      }
+      return html;
+    }
+
     // Translation in English mode.
     function translateEnglish() {
       const inputText = document.getElementById("inputEnglish").value.trim();
@@ -309,8 +336,6 @@
         const code = getFinalCode(word);
         const definition = defDict[candidate] || "";
         const synonyms = bciSynonyms[code] || "";
-        const norm = normalizeWord(word);
-
         let cellHTML = `<div class="word-cell">`;
         cellHTML += `
           <figure>
@@ -323,23 +348,8 @@
             </figcaption>
           </figure>
         `;
-        // If the word has components, add a breakdown row.
-        if (compMapping[norm]) {
-          cellHTML += `<div class="components">`;
-          compMapping[norm].forEach(comp => {
-            const compCode = getFinalCode(comp);
-            cellHTML += `
-              <figure>
-                <img src="bliss_svg_id/${compCode}.svg" alt="${comp}" title="${comp}">
-                <figcaption>
-                  ${comp}<br>
-                  ID: ${compCode}
-                </figcaption>
-              </figure>
-            `;
-          });
-          cellHTML += `</div>`;
-        }
+        // Append recursive breakdown rows, if any.
+        cellHTML += renderBreakdown(word);
         cellHTML += `</div>`;
         outputHTML += cellHTML;
       });
@@ -361,7 +371,6 @@
         const candidate = reverseBciMap[code] || code;
         const definition = defDict[candidate] || "";
         const synonyms = bciSynonyms[code] || "";
-        const norm = normalizeWord(candidate);
         let cellHTML = `<div class="word-cell">`;
         cellHTML += `
           <figure>
@@ -374,23 +383,8 @@
             </figcaption>
           </figure>
         `;
-        // Optionally include component breakdown if candidate is composite.
-        if (compMapping[norm]) {
-          cellHTML += `<div class="components">`;
-          compMapping[norm].forEach(comp => {
-            const compCode = getFinalCode(comp);
-            cellHTML += `
-              <figure>
-                <img src="bliss_svg_id/${compCode}.svg" alt="${comp}" title="${comp}">
-                <figcaption>
-                  ${comp}<br>
-                  ID: ${compCode}
-                </figcaption>
-              </figure>
-            `;
-          });
-          cellHTML += `</div>`;
-        }
+        // Append recursive breakdown rows for numeric mode.
+        cellHTML += renderBreakdown(candidate);
         cellHTML += `</div>`;
         outputHTML += cellHTML;
       });
