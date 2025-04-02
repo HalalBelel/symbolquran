@@ -19,7 +19,7 @@
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
-      align-items: center;
+      align-items: flex-start;
     }
     /* Constrain one dimension for images and maintain aspect ratio */
     #output img {
@@ -27,6 +27,17 @@
       height: auto;
       width: auto;
       vertical-align: middle;
+    }
+    /* Style for each translated symbol block */
+    #output figure {
+      margin: 0;
+      text-align: center;
+      display: inline-block;
+    }
+    #output figcaption {
+      font-size: 0.8rem;
+      margin-top: 2px;
+      color: #333;
     }
     #output span {
       font-size: 1.2rem;
@@ -49,7 +60,7 @@
 </head>
 <body>
   <h1>Intelligent English to Bliss Translator</h1>
-  <p>Enter your phrase below and click "Translate" to see the corresponding Bliss symbols.</p>
+  <p>Enter your phrase below and click "Translate" to see the corresponding Bliss symbols with their dictionary English below each symbol.</p>
   <textarea id="inputText" placeholder="Enter your phrase here..."></textarea>
   <br>
   <button id="translateButton" disabled>Translate</button>
@@ -150,7 +161,7 @@
       return word.toLowerCase();
     }
 
-    // The translate function that processes the input and displays SVGs.
+    // The translate function processes the input and displays symbols with their dictionary English.
     function translate() {
       const inputText = document.getElementById('inputText').value.trim();
       if (!inputText) {
@@ -165,17 +176,20 @@
         let cleanedOriginal = word.replace(/[.,!?]/g, '');
         let normalized = normalizeWord(cleanedOriginal);
         let code = glossToCode[normalized];
+        // Store the matched dictionary word (for the caption)
+        let matchedGloss = normalized;
         console.log("Processing word:", word, "-> cleaned:", cleanedOriginal, "-> normalized:", normalized, "-> code:", code);
         
         if (!code) {
           const bestMatch = findBestMatch(normalized);
           if (bestMatch) {
             code = glossToCode[bestMatch];
+            matchedGloss = bestMatch;
             console.log("Fuzzy matched:", normalized, "->", bestMatch, "-> code:", code);
           }
         }
         if (code) {
-          outputHTML += `<img src="bliss_svg_id/${code}.svg" alt="${cleanedOriginal}" title="${cleanedOriginal}"> `;
+          outputHTML += `<figure><img src="bliss_svg_id/${code}.svg" alt="${cleanedOriginal}" title="${cleanedOriginal}"><figcaption>${matchedGloss}</figcaption></figure> `;
         } else {
           outputHTML += `<span>${word}</span> `;
         }
