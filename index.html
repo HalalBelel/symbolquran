@@ -74,7 +74,7 @@
     let glossList = [];
 
     // Load dictionary file dynamically.
-    const dictionaryFile = "BCI-AV_SKOG_2024-10-30_ID_to_gloss_map.txt"; // Update the path if needed.
+    const dictionaryFile = "BCI-AV_SKOG_2024-10-30_ID_to_gloss_map.txt"; // Ensure this file is in the correct location.
     fetch(dictionaryFile)
       .then(response => {
         if (!response.ok) {
@@ -105,6 +105,7 @@
           glossList.push(cleaned);
         });
       });
+      console.log("Processed dictionary:", glossToCode);
     }
 
     // Fallback fuzzy matching using Levenshtein distance.
@@ -163,15 +164,19 @@
       }
       const words = inputText.split(/\s+/);
       let outputHTML = "";
-
+      console.log("Translating input:", inputText);
+      
       words.forEach(word => {
         let cleanedOriginal = word.replace(/[.,!?]/g, '');
         let normalized = normalizeWord(cleanedOriginal);
         let code = glossToCode[normalized];
+        console.log("Processing word:", word, "-> cleaned:", cleanedOriginal, "-> normalized:", normalized, "-> code:", code);
+        
         if (!code) {
           const bestMatch = findBestMatch(normalized);
           if (bestMatch) {
             code = glossToCode[bestMatch];
+            console.log("Fuzzy matched:", normalized, "->", bestMatch, "-> code:", code);
           }
         }
         if (code) {
