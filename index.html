@@ -293,12 +293,13 @@
       return normalized;
     }
 
-    // Recursive function to render breakdown rows.
-    function renderBreakdown(word) {
+    // Recursive function to render breakdown rows with a depth limit.
+    function renderBreakdown(word, depth = 0) {
+      const MAX_DEPTH = 5;
+      if (depth >= MAX_DEPTH) return "";
       let html = "";
       const norm = normalizeWord(word);
       if (compMapping[norm]) {
-        // Render a row for the immediate components.
         html += `<div class="components">`;
         compMapping[norm].forEach(comp => {
           const compCode = getFinalCode(comp);
@@ -313,9 +314,8 @@
           `;
         });
         html += `</div>`;
-        // Recursively add breakdown rows for each component.
         compMapping[norm].forEach(comp => {
-          html += renderBreakdown(comp);
+          html += renderBreakdown(comp, depth + 1);
         });
       }
       return html;
