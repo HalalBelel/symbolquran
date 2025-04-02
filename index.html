@@ -15,6 +15,7 @@
       margin-bottom: 1rem;
       padding: 0.5rem;
     }
+    /* Overall container holds each word-cell in a row */
     #output {
       margin-top: 1rem;
       display: flex;
@@ -22,30 +23,55 @@
       gap: 10px;
       align-items: flex-start;
     }
+    /* Each word becomes a cell with two rows (stacked vertically) */
+    .word-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 5px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      background: #fff;
+    }
     /* Each symbol is shown in a figure with a caption */
-    #output figure {
+    .word-cell figure {
       margin: 0;
       text-align: center;
-      display: inline-block;
     }
     /* Constrain SVG images to a max height while preserving aspect ratio */
-    #output img {
+    .word-cell img {
       max-height: 50px;
       height: auto;
       width: auto;
       vertical-align: middle;
     }
-    #output figcaption {
+    .word-cell figcaption {
       font-size: 0.8rem;
       margin-top: 2px;
       color: #333;
     }
-    /* New style for composite component breakdown */
+    /* Component breakdown is shown as a row below the main symbol */
     .components {
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
       margin-top: 10px;
+    }
+    /* Style for the breakdown figures (components) */
+    .components figure {
+      margin: 0;
+      text-align: center;
+    }
+    .components img {
+      max-height: 30px;
+      height: auto;
+      width: auto;
+      vertical-align: middle;
+    }
+    .components figcaption {
+      font-size: 0.7rem;
+      margin-top: 2px;
+      color: #555;
     }
     button {
       padding: 0.5rem 1rem;
@@ -95,14 +121,13 @@
 
     // Global dictionaries.
     let defDict = {};   // from def_dict.json: normalized word → definition
-    let svgDict = {};   // from svg_dict.json: keys (possibly comma-separated) → symbol filename (we use keys for candidate gloss)
+    let svgDict = {};   // from svg_dict.json: keys (possibly comma-separated) → symbol filename
     let compDict = {};  // from comp_dict.json: keys → array of subcomponent words
     let bciMap = {};    // from BCI-AV_SKOG_2024-10-30_ID_to_gloss_map.txt: normalized gloss → numeric code
     let reverseBciMap = {}; // reverse mapping: numeric code → candidate English (first encountered)
-    let bciSynonyms = {};   // NEW: mapping numeric code → synonyms (a comma-separated string)
+    let bciSynonyms = {};   // mapping numeric code → synonyms (comma-separated string)
 
     const DEFAULT_CODE = "8485";       // Default numeric code for question_mark
-    const DEFAULT_CAPTION = "question_mark";
 
     // Load JSON files and the BCI text file concurrently.
     Promise.all([
@@ -151,7 +176,6 @@
             if (!bciMap[cleaned]) {
               bciMap[cleaned] = code;
             }
-            // Build reverse mapping (first encountered candidate for a numeric code)
             if (!reverseBciMap[code]) {
               reverseBciMap[code] = cleaned;
             }
@@ -249,11 +273,9 @@
     function getCandidate(word) {
       const cleaned = word.replace(/[.,!?]/g, "");
       const normalized = normalizeWord(cleaned);
-      // 1. Check direct match from svgMapping.
       if (svgMapping[normalized]) {
         return svgMapping[normalized];
       }
-      // 2. Check compound mapping.
       if (compMapping[normalized]) {
         const comps = compMapping[normalized];
         let validComponents = [];
@@ -269,7 +291,6 @@
           return validComponents.join(" ");
         }
       }
-      // 3. Fallback.
       return normalized;
     }
 
@@ -288,7 +309,10 @@
         const code = getFinalCode(word);
         const definition = defDict[candidate] || "";
         const synonyms = bciSynonyms[code] || "";
-        let mainFigureHTML = `
+        const norm = normalizeWord(word);
+
+        let cellHTML = `<div class="word-cell">`;
+        cellHTML += `
           <figure>
             <img src="bliss_svg_id/${code}.svg" alt="${word}" title="${word}">
             <figcaption>
@@ -299,15 +323,12 @@
             </figcaption>
           </figure>
         `;
-        outputHTML += mainFigureHTML;
-
-        // If the word is composite, add a breakdown of its components.
-        const norm = normalizeWord(word);
+        // If the word has components, add a breakdown row.
         if (compMapping[norm]) {
-          let compHTML = `<div class="components">`;
+          cellHTML += `<div class="components">`;
           compMapping[norm].forEach(comp => {
             const compCode = getFinalCode(comp);
-            compHTML += `
+            cellHTML += `
               <figure>
                 <img src="bliss_svg_id/${compCode}.svg" alt="${comp}" title="${comp}">
                 <figcaption>
@@ -317,9 +338,10 @@
               </figure>
             `;
           });
-          compHTML += `</div>`;
-          outputHTML += compHTML;
+          cellHTML += `</div>`;
         }
+        cellHTML += `</div>`;
+        outputHTML += cellHTML;
       });
       document.getElementById("output").innerHTML = outputHTML;
     }
@@ -333,13 +355,15 @@
       }
       const tokens = inputNumbers.split(/\s+/);
       let outputHTML = "";
+
       tokens.forEach(token => {
         const code = token.replace(/[.,!?]/g, "").trim();
-        // Get candidate english from reverseBciMap, if available.
         const candidate = reverseBciMap[code] || code;
         const definition = defDict[candidate] || "";
         const synonyms = bciSynonyms[code] || "";
-        outputHTML += `
+        const norm = normalizeWord(candidate);
+        let cellHTML = `<div class="word-cell">`;
+        cellHTML += `
           <figure>
             <img src="bliss_svg_id/${code}.svg" alt="${code}" title="${code}">
             <figcaption>
@@ -350,6 +374,25 @@
             </figcaption>
           </figure>
         `;
+        // Optionally include component breakdown if candidate is composite.
+        if (compMapping[norm]) {
+          cellHTML += `<div class="components">`;
+          compMapping[norm].forEach(comp => {
+            const compCode = getFinalCode(comp);
+            cellHTML += `
+              <figure>
+                <img src="bliss_svg_id/${compCode}.svg" alt="${comp}" title="${comp}">
+                <figcaption>
+                  ${comp}<br>
+                  ID: ${compCode}
+                </figcaption>
+              </figure>
+            `;
+          });
+          cellHTML += `</div>`;
+        }
+        cellHTML += `</div>`;
+        outputHTML += cellHTML;
       });
       document.getElementById("output").innerHTML = outputHTML;
     }
