@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Intelligent English to Bliss Translator</title>
+  <title>Intelligent English to Bliss Translator – Strict Mode</title>
   <style>
     body {
       font-family: sans-serif;
@@ -21,27 +21,23 @@
       gap: 10px;
       align-items: flex-start;
     }
-    /* Constrain one dimension for images and maintain aspect ratio */
+    /* Each translated symbol is wrapped in a figure */
+    #output figure {
+      margin: 0;
+      text-align: center;
+      display: inline-block;
+    }
+    /* Constrain SVG images to a maximum height while preserving aspect ratio */
     #output img {
       max-height: 50px;
       height: auto;
       width: auto;
       vertical-align: middle;
     }
-    /* Style for each translated symbol block */
-    #output figure {
-      margin: 0;
-      text-align: center;
-      display: inline-block;
-    }
     #output figcaption {
       font-size: 0.8rem;
       margin-top: 2px;
       color: #333;
-    }
-    #output span {
-      font-size: 1.2rem;
-      color: #555;
     }
     button {
       padding: 0.5rem 1rem;
@@ -59,8 +55,12 @@
   </style>
 </head>
 <body>
-  <h1>Intelligent English to Bliss Translator</h1>
-  <p>Enter your phrase below and click "Translate" to see the corresponding Bliss symbols with their dictionary English below each symbol.</p>
+  <h1>Intelligent English to Bliss Translator – Strict Mode</h1>
+  <p>
+    Enter your phrase below and click "Translate" to see the corresponding Bliss symbols.
+    Under each symbol, the dictionary English (or matched synonym) and definition will appear.
+    This version is strict: if an exact match isn’t found, it defaults to a question mark.
+  </p>
   <textarea id="inputText" placeholder="Enter your phrase here..."></textarea>
   <br>
   <button id="translateButton" disabled>Translate</button>
@@ -71,10 +71,10 @@
     <div id="updatesBox"></div>
   </div>
 
-  <!-- Include the lightweight NLP library, Compromise.js -->
+  <!-- Include Compromise.js for lightweight NLP -->
   <script src="https://unpkg.com/compromise"></script>
   <script>
-    // Author update and version stamp.
+    // Version stamp and author info.
     const AUTHOR_UPDATE = "Notes: Kindly send feedback to info@onewordquran.com, may Allah bless the contributors";
     const modifiedDate = new Date(document.lastModified);
     const versionText = "Version: " + modifiedDate.toLocaleDateString("en-AU") + " " + modifiedDate.toLocaleTimeString("en-AU");
@@ -83,75 +83,58 @@
       document.getElementById("updatesBox").textContent = AUTHOR_UPDATE + "\n" + versionText;
     });
 
-    // Globals for dictionary mapping.
-    let glossToCode = {};
-    let glossList = [];
+    // Global variables for our dictionaries.
+    let defDict = {};    // from def_dict.json: word -> definition
+    let svgDict = {};    // from svg_dict.json: key (possibly comma‐separated words) -> svg filename (including .svg)
+    let compDict = {};   // from comp_dict.json: key (possibly comma‐separated) -> array of subcomponent words
+    let svgMapping = {}; // Processed mapping: normalized word -> svg filename
+    let compMapping = {}; // Processed compound mapping: normalized word -> array of subcomponent words
+    const DEFAULT_SYMBOL = "8485"; // Default code for question mark
+    const DEFAULT_CAPTION = "question_mark";
 
-    // Load dictionary file dynamically.
-    const dictionaryFile = "BCI-AV_SKOG_2024-10-30_ID_to_gloss_map.txt"; // Update path if needed.
-    fetch(dictionaryFile)
-      .then(response => {
-        if (!response.ok) { throw new Error("Failed to load dictionary file."); }
-        return response.text();
-      })
-      .then(text => {
-        processDictionaryData(text);
-        // Enable the translate button once the dictionary is loaded.
-        document.getElementById("translateButton").disabled = false;
-        console.log("Dictionary loaded successfully.");
-      })
-      .catch(err => {
-        console.error("Error loading dictionary:", err);
-        document.getElementById("output").innerHTML = `<span>Error loading dictionary. Check the console for details.</span>`;
-      });
+    // Load the three JSON files concurrently.
+    Promise.all([
+      fetch("def_dict.json").then(res => res.json()),
+      fetch("svg_dict.json").then(res => res.json()),
+      fetch("comp_dict.json").then(res => res.json())
+    ]).then(([defData, svgData, compData]) => {
+      defDict = defData;
+      svgDict = svgData;
+      compDict = compData;
+      buildSvgMapping();
+      buildCompMapping();
+      document.getElementById("translateButton").disabled = false;
+      console.log("Dictionaries loaded successfully.");
+    }).catch(err => {
+      console.error("Error loading dictionaries:", err);
+      document.getElementById("output").innerHTML = "<span>Error loading dictionaries. Check console for details.</span>";
+    });
 
-    // Process dictionary text data (each line: code[TAB]gloss1,gloss2,...)
-    function processDictionaryData(dictionaryData) {
-      dictionaryData.split('\n').forEach(line => {
-        if (line.trim() === "") return;
-        const [code, glosses] = line.split('\t');
-        glosses.split(',').forEach(word => {
-          // Normalize: lower-case and remove annotations like "-(to)"
-          let cleaned = word.trim().toLowerCase().replace(/-\(.*\)/, '');
-          glossToCode[cleaned] = code;
-          glossList.push(cleaned);
+    // Build svgMapping from svgDict.
+    function buildSvgMapping() {
+      for (const key in svgDict) {
+        const svgFilename = svgDict[key]; // e.g. "combine,connect,link-(to).svg"
+        const words = key.split(",").map(s => s.trim().toLowerCase());
+        words.forEach(word => {
+          svgMapping[word] = svgFilename;
         });
-      });
-      console.log("Processed dictionary:", glossToCode);
-    }
-
-    // Fallback fuzzy matching using Levenshtein distance.
-    function levenshtein(a, b) {
-      const dp = Array(a.length + 1).fill(null).map(() => Array(b.length + 1).fill(0));
-      for (let i = 0; i <= a.length; i++) dp[i][0] = i;
-      for (let j = 0; j <= b.length; j++) dp[0][j] = j;
-      for (let i = 1; i <= a.length; i++) {
-        for (let j = 1; j <= b.length; j++) {
-          dp[i][j] = Math.min(
-            dp[i - 1][j] + 1,
-            dp[i][j - 1] + 1,
-            dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
-          );
-        }
       }
-      return dp[a.length][b.length];
+      console.log("SVG Mapping:", svgMapping);
     }
 
-    function findBestMatch(word) {
-      let bestMatch = null;
-      let bestDistance = Infinity;
-      const threshold = Math.max(2, Math.floor(word.length / 2)); // Adjustable threshold.
-      glossList.forEach(gloss => {
-        const distance = levenshtein(word, gloss);
-        if (distance < bestDistance && distance <= threshold) {
-          bestDistance = distance;
-          bestMatch = gloss;
-        }
-      });
-      return bestMatch;
+    // Build compMapping from compDict.
+    function buildCompMapping() {
+      for (const key in compDict) {
+        const components = compDict[key]; // an array of subcomponent words
+        const words = key.split(",").map(s => s.trim().toLowerCase());
+        words.forEach(word => {
+          compMapping[word] = components.map(c => c.trim().toLowerCase());
+        });
+      }
+      console.log("Compound Mapping:", compMapping);
     }
 
-    // Use Compromise.js to normalize each word (e.g., lemmatize or singularize)
+    // Normalize a word using Compromise.js.
     function normalizeWord(word) {
       let doc = nlp(word);
       let verbForm = doc.verbs().toInfinitive().out('text');
@@ -161,11 +144,41 @@
       return word.toLowerCase();
     }
 
-    // The translate function processes the input and displays symbols with their dictionary English.
+    // Strict lookup: return an object { svg: filename, caption: text }.
+    // If an exact match is found in svgMapping, use it.
+    // Else, if there's a compound in compMapping and all subcomponents are found, combine them.
+    // Otherwise, return the default symbol.
+    function getSvgForWord(word) {
+      const normalized = normalizeWord(word.replace(/[.,!?]/g, ''));
+      if (svgMapping[normalized]) {
+        return { svg: svgMapping[normalized], caption: normalized };
+      }
+      if (compMapping[normalized]) {
+        const components = compMapping[normalized];
+        let codes = [];
+        let captions = [];
+        for (const comp of components) {
+          if (svgMapping[comp]) {
+            codes.push(svgMapping[comp]); // svg filename already includes .svg
+            captions.push(comp);
+          } else {
+            codes = [];
+            break;
+          }
+        }
+        if (codes.length > 0) {
+          return { svg: codes.join("+"), caption: captions.join("+") };
+        }
+      }
+      // No match found; return default.
+      return { svg: DEFAULT_SYMBOL, caption: DEFAULT_CAPTION };
+    }
+
+    // Translate the input text.
     function translate() {
-      const inputText = document.getElementById('inputText').value.trim();
+      const inputText = document.getElementById("inputText").value.trim();
       if (!inputText) {
-        document.getElementById('output').innerHTML = "<span>No input provided.</span>";
+        document.getElementById("output").innerHTML = "<span>No input provided.</span>";
         return;
       }
       const words = inputText.split(/\s+/);
@@ -173,31 +186,30 @@
       console.log("Translating input:", inputText);
       
       words.forEach(word => {
-        let cleanedOriginal = word.replace(/[.,!?]/g, '');
-        let normalized = normalizeWord(cleanedOriginal);
-        let code = glossToCode[normalized];
-        // Store the matched dictionary word (for the caption)
-        let matchedGloss = normalized;
-        console.log("Processing word:", word, "-> cleaned:", cleanedOriginal, "-> normalized:", normalized, "-> code:", code);
-        
-        if (!code) {
-          const bestMatch = findBestMatch(normalized);
-          if (bestMatch) {
-            code = glossToCode[bestMatch];
-            matchedGloss = bestMatch;
-            console.log("Fuzzy matched:", normalized, "->", bestMatch, "-> code:", code);
-          }
+        const result = getSvgForWord(word);
+        // Get definition from defDict if available.
+        let definition = defDict[result.caption] || "";
+        let captionText = result.caption;
+        if (definition) {
+          captionText += "<br><em>" + definition + "</em>";
         }
-        if (code) {
-          outputHTML += `<figure><img src="bliss_svg_id/${code}.svg" alt="${cleanedOriginal}" title="${cleanedOriginal}"><figcaption>${matchedGloss}</figcaption></figure> `;
+        // If compound (multiple svg filenames joined with '+'), display each.
+        if (result.svg.includes("+")) {
+          const svgFiles = result.svg.split("+");
+          let groupHTML = "<figure>";
+          svgFiles.forEach(svgFile => {
+            groupHTML += `<img src="bliss_svg_id/${svgFile}" alt="${word}" title="${word}"> `;
+          });
+          groupHTML += `<figcaption>${captionText}</figcaption></figure> `;
+          outputHTML += groupHTML;
         } else {
-          outputHTML += `<span>${word}</span> `;
+          outputHTML += `<figure><img src="bliss_svg_id/${result.svg}" alt="${word}" title="${word}"><figcaption>${captionText}</figcaption></figure> `;
         }
       });
-      document.getElementById('output').innerHTML = outputHTML;
+      document.getElementById("output").innerHTML = outputHTML;
     }
 
-    // Attach the click event handler after the DOM has loaded.
+    // Attach the click event listener.
     document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("translateButton").addEventListener("click", translate);
     });
