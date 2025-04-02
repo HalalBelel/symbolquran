@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Intelligent English to Bliss Translator – Strict Mode</title>
+  <title>English to Bliss Translator – Strict Numeric Mode</title>
   <style>
     body {
       font-family: sans-serif;
@@ -21,13 +21,13 @@
       gap: 10px;
       align-items: flex-start;
     }
-    /* Each translated symbol is wrapped in a figure */
+    /* Each symbol is shown in a figure with a caption */
     #output figure {
       margin: 0;
       text-align: center;
       display: inline-block;
     }
-    /* Constrain SVG images to a maximum height while preserving aspect ratio */
+    /* Constrain the SVG image to a max height while preserving its aspect ratio */
     #output img {
       max-height: 50px;
       height: auto;
@@ -55,26 +55,28 @@
   </style>
 </head>
 <body>
-  <h1>Intelligent English to Bliss Translator – Strict Mode</h1>
+  <h1>English to Bliss Translator – Strict Numeric Mode</h1>
   <p>
-    Enter your phrase below and click "Translate" to see the corresponding Bliss symbols.
-    Under each symbol, the dictionary English (or matched synonym) and definition will appear.
-    This version is strict: if an exact match isn’t found, it defaults to a question mark.
+    Enter your phrase and click “Translate” to see the corresponding Bliss symbols.
+    <br>
+    The translator first searches the BCI mapping (after cleaning and splitting the text file).
+    If no exact match is found, it uses the synonym/compound dictionaries (svg_dict.json and comp_dict.json)
+    to get a candidate gloss and then does one final search in def_dict.json (with a strict threshold)
+    before defaulting to a question-mark (<code>8485.svg</code>).
   </p>
   <textarea id="inputText" placeholder="Enter your phrase here..."></textarea>
   <br>
   <button id="translateButton" disabled>Translate</button>
   <div id="output"></div>
-
   <div id="versionContainer">
     <div id="versionInfo"></div>
     <div id="updatesBox"></div>
   </div>
 
-  <!-- Include Compromise.js for lightweight NLP -->
+  <!-- Include Compromise.js for basic NLP normalization -->
   <script src="https://unpkg.com/compromise"></script>
   <script>
-    // Version stamp and author info.
+    // Version stamp & author info.
     const AUTHOR_UPDATE = "Notes: Kindly send feedback to info@onewordquran.com, may Allah bless the contributors";
     const modifiedDate = new Date(document.lastModified);
     const versionText = "Version: " + modifiedDate.toLocaleDateString("en-AU") + " " + modifiedDate.toLocaleTimeString("en-AU");
@@ -83,98 +85,181 @@
       document.getElementById("updatesBox").textContent = AUTHOR_UPDATE + "\n" + versionText;
     });
 
-    // Global variables for our dictionaries.
-    let defDict = {};    // from def_dict.json: word -> definition
-    let svgDict = {};    // from svg_dict.json: key (possibly comma‐separated words) -> svg filename (including .svg)
-    let compDict = {};   // from comp_dict.json: key (possibly comma‐separated) -> array of subcomponent words
-    let svgMapping = {}; // Processed mapping: normalized word -> svg filename
-    let compMapping = {}; // Processed compound mapping: normalized word -> array of subcomponent words
-    const DEFAULT_SYMBOL = "8485"; // Default code for question mark
+    // Global dictionaries.
+    let defDict = {};   // from def_dict.json: normalized word -> definition
+    let svgDict = {};   // from svg_dict.json: keys (possibly comma-separated) → symbol filename (not used directly for numeric mapping)
+    let compDict = {};  // from comp_dict.json: keys → array of subcomponent words
+    let bciMap = {};    // from BCI-AV_SKOG_2024-10-30_ID_to_gloss_map.txt: normalized gloss -> numeric code
+
+    const DEFAULT_CODE = "8485";       // Default numeric code (question mark)
     const DEFAULT_CAPTION = "question_mark";
 
-    // Load the three JSON files concurrently.
+    // Load def_dict.json, svg_dict.json, comp_dict.json, and the BCI mapping file concurrently.
     Promise.all([
-      fetch("def_dict.json").then(res => res.json()),
-      fetch("svg_dict.json").then(res => res.json()),
-      fetch("comp_dict.json").then(res => res.json())
-    ]).then(([defData, svgData, compData]) => {
+      fetch("def_dict.json").then(r => r.ok ? r.json() : Promise.resolve({})),
+      fetch("svg_dict.json").then(r => r.ok ? r.json() : Promise.resolve({})),
+      fetch("comp_dict.json").then(r => r.ok ? r.json() : Promise.resolve({})),
+      fetch("BCI-AV_SKOG_2024-10-30_ID_to_gloss_map.txt").then(r => {
+        if (!r.ok) throw new Error("Failed to load BCI file.");
+        return r.text();
+      })
+    ])
+    .then(([defData, svgData, compData, bciText]) => {
       defDict = defData;
       svgDict = svgData;
       compDict = compData;
+      processBciData(bciText);
       buildSvgMapping();
       buildCompMapping();
       document.getElementById("translateButton").disabled = false;
-      console.log("Dictionaries loaded successfully.");
-    }).catch(err => {
-      console.error("Error loading dictionaries:", err);
+      console.log("All dictionaries loaded successfully.");
+    })
+    .catch(err => {
+      console.error("Error loading dictionary files:", err);
       document.getElementById("output").innerHTML = "<span>Error loading dictionaries. Check console for details.</span>";
     });
 
-    // Build svgMapping from svgDict.
-    function buildSvgMapping() {
-      for (const key in svgDict) {
-        const svgFilename = svgDict[key]; // e.g. "combine,connect,link-(to).svg"
-        const words = key.split(",").map(s => s.trim().toLowerCase());
-        words.forEach(word => {
-          svgMapping[word] = svgFilename;
+    // Process the BCI text file.
+    // Each line is in the format: code<TAB>gloss1,gloss2,...
+    function processBciData(text) {
+      text.split("\n").forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+        const parts = trimmed.split("\t");
+        if (parts.length < 2) return;
+        const code = parts[0].trim();
+        const glosses = parts[1].trim();
+        glosses.split(",").forEach(rawGloss => {
+          // Clean the gloss: remove content in parentheses and underscores.
+          let cleaned = rawGloss.toLowerCase()
+                                .replace(/-\(.*?\)/g, "") // remove trailing annotations like -(to)
+                                .replace(/\(.*?\)/g, "")   // remove any parentheses content (e.g., (bci))
+                                .replace(/_/g, " ")
+                                .trim();
+          if (cleaned && !bciMap[cleaned]) {
+            bciMap[cleaned] = code;
+          }
         });
-      }
-      console.log("SVG Mapping:", svgMapping);
+      });
+      console.log("Processed BCI Map:", bciMap);
     }
 
-    // Build compMapping from compDict.
+    // Build a mapping from svg_dict.json.
+    // For each key (which may be comma-separated), split and normalize.
+    let svgMapping = {};  // key: normalized word, value: candidate gloss (here we simply use the normalized word)
+    function buildSvgMapping() {
+      for (const key in svgDict) {
+        const words = key.split(",").map(s => s.trim().toLowerCase());
+        words.forEach(word => {
+          svgMapping[word] = word;
+        });
+      }
+      console.log("SVG Mapping (from svg_dict):", svgMapping);
+    }
+
+    // Build compound mapping from comp_dict.json.
+    let compMapping = {};  // key: normalized word, value: array of subcomponent words
     function buildCompMapping() {
       for (const key in compDict) {
-        const components = compDict[key]; // an array of subcomponent words
+        const components = compDict[key];
         const words = key.split(",").map(s => s.trim().toLowerCase());
         words.forEach(word => {
           compMapping[word] = components.map(c => c.trim().toLowerCase());
         });
       }
-      console.log("Compound Mapping:", compMapping);
+      console.log("Compound Mapping (from comp_dict):", compMapping);
     }
 
     // Normalize a word using Compromise.js.
     function normalizeWord(word) {
       let doc = nlp(word);
-      let verbForm = doc.verbs().toInfinitive().out('text');
-      if (verbForm && verbForm !== "") { return verbForm.toLowerCase(); }
-      let nounForm = doc.nouns().toSingular().out('text');
-      if (nounForm && nounForm !== "") { return nounForm.toLowerCase(); }
+      let verbForm = doc.verbs().toInfinitive().out("text");
+      if (verbForm) return verbForm.toLowerCase();
+      let nounForm = doc.nouns().toSingular().out("text");
+      if (nounForm) return nounForm.toLowerCase();
       return word.toLowerCase();
     }
 
-    // Strict lookup: return an object { svg: filename, caption: text }.
-    // If an exact match is found in svgMapping, use it.
-    // Else, if there's a compound in compMapping and all subcomponents are found, combine them.
-    // Otherwise, return the default symbol.
-    function getSvgForWord(word) {
-      const normalized = normalizeWord(word.replace(/[.,!?]/g, ''));
-      if (svgMapping[normalized]) {
-        return { svg: svgMapping[normalized], caption: normalized };
+    // Levenshtein distance function.
+    function levenshtein(a, b) {
+      const dp = Array(a.length + 1).fill(null).map(() => Array(b.length + 1).fill(0));
+      for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+      for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+      for (let i = 1; i <= a.length; i++) {
+        for (let j = 1; j <= b.length; j++) {
+          dp[i][j] = Math.min(
+            dp[i - 1][j] + 1,
+            dp[i][j - 1] + 1,
+            dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+          );
+        }
       }
+      return dp[a.length][b.length];
+    }
+
+    // Final search using def_dict as a fallback.
+    // It searches defDict keys for one that is almost identical (distance <= 1) to candidate.
+    function finalDefSearch(candidate) {
+      let bestKey = null;
+      let bestDistance = Infinity;
+      for (const key in defDict) {
+        const d = levenshtein(candidate, key);
+        if (d < bestDistance) {
+          bestDistance = d;
+          bestKey = key;
+        }
+      }
+      return (bestDistance <= 1) ? bestKey : null;
+    }
+
+    // First, try a direct lookup in the BCI mapping using the normalized word.
+    // If not found, use the candidate from the synonym/compound dictionaries.
+    // Then, if still not found, do a final search in def_dict.
+    function getFinalCode(word) {
+      const cleaned = word.replace(/[.,!?]/g, "");
+      const normalized = normalizeWord(cleaned);
+      if (bciMap[normalized]) {
+        return bciMap[normalized];
+      }
+      let candidate = getCandidate(word);
+      if (!bciMap[candidate]) {
+        const defCandidate = finalDefSearch(candidate);
+        if (defCandidate && bciMap[defCandidate]) {
+          candidate = defCandidate;
+        }
+      }
+      return bciMap[candidate] || DEFAULT_CODE;
+    }
+
+    // Determine a candidate gloss using svg_dict and comp_dict.
+    function getCandidate(word) {
+      const cleaned = word.replace(/[.,!?]/g, "");
+      const normalized = normalizeWord(cleaned);
+      // 1. Check direct match from svgMapping.
+      if (svgMapping[normalized]) {
+        return svgMapping[normalized];
+      }
+      // 2. Check compound mapping: if the normalized word exists in compMapping and all subcomponents exist.
       if (compMapping[normalized]) {
-        const components = compMapping[normalized];
-        let codes = [];
-        let captions = [];
-        for (const comp of components) {
+        const comps = compMapping[normalized];
+        let validComponents = [];
+        for (const comp of comps) {
           if (svgMapping[comp]) {
-            codes.push(svgMapping[comp]); // svg filename already includes .svg
-            captions.push(comp);
+            validComponents.push(comp);
           } else {
-            codes = [];
+            validComponents = [];
             break;
           }
         }
-        if (codes.length > 0) {
-          return { svg: codes.join("+"), caption: captions.join("+") };
+        if (validComponents.length > 0) {
+          return validComponents.join(" ");
         }
       }
-      // No match found; return default.
-      return { svg: DEFAULT_SYMBOL, caption: DEFAULT_CAPTION };
+      // 3. Fallback: return the normalized word.
+      return normalized;
     }
 
-    // Translate the input text.
+    // Translate the user input.
     function translate() {
       const inputText = document.getElementById("inputText").value.trim();
       if (!inputText) {
@@ -183,33 +268,27 @@
       }
       const words = inputText.split(/\s+/);
       let outputHTML = "";
-      console.log("Translating input:", inputText);
-      
+
       words.forEach(word => {
-        const result = getSvgForWord(word);
-        // Get definition from defDict if available.
-        let definition = defDict[result.caption] || "";
-        let captionText = result.caption;
+        const candidate = getCandidate(word);
+        const code = getFinalCode(word);
+        // Use candidate to fetch a definition from defDict (if available).
+        let definition = defDict[candidate] || "";
+        let captionText = candidate;
         if (definition) {
           captionText += "<br><em>" + definition + "</em>";
         }
-        // If compound (multiple svg filenames joined with '+'), display each.
-        if (result.svg.includes("+")) {
-          const svgFiles = result.svg.split("+");
-          let groupHTML = "<figure>";
-          svgFiles.forEach(svgFile => {
-            groupHTML += `<img src="bliss_svg_id/${svgFile}" alt="${word}" title="${word}"> `;
-          });
-          groupHTML += `<figcaption>${captionText}</figcaption></figure> `;
-          outputHTML += groupHTML;
-        } else {
-          outputHTML += `<figure><img src="bliss_svg_id/${result.svg}" alt="${word}" title="${word}"><figcaption>${captionText}</figcaption></figure> `;
-        }
+        outputHTML += `
+          <figure>
+            <img src="bliss_svg_id/${code}.svg" alt="${word}" title="${word}">
+            <figcaption>${captionText}</figcaption>
+          </figure>
+        `;
       });
       document.getElementById("output").innerHTML = outputHTML;
     }
 
-    // Attach the click event listener.
+    // Attach the Translate button click event.
     document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("translateButton").addEventListener("click", translate);
     });
