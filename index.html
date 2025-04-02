@@ -1,1 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Intelligent English to Bliss Translator</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 2rem;
+      background: #f9f9f9;
+    }
+    textarea {
+      width: 100%;
+      height: 100px;
+      font-size: 1rem;
+    }
+    #output {
+      margin-top: 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    #output img {
+      width: 50px;
+      height: 50px;
+    }
+    #output span {
+      font-size: 1.2rem;
+      color: #555;
+    }
+    button {
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Intelligent English to Bliss Translator</h1>
+  <p>Enter your phrase below and click "Translate" to see the corresponding Bliss symbols.</p>
+  <textarea id="inputText" placeholder="Enter your phrase here..."></textarea>
+  <br>
+  <button onclick="translate()">Translate</button>
+  <div id="output"></div>
+
+  <!-- Include the lightweight NLP library, Compromise.js -->
+  <script src="https://unpkg.com/compromise"></script>
+  <script>
+    // Sample dictionary data (each line: code[TAB]gloss1,gloss2,...)
+    const dictionaryData = `12584	artificial_respiration
+12585	give_artificial_respiration,resuscitate,revive-(to)
+12586	ashes`;
+
+    // Build a mapping from each cleaned gloss to its corresponding code.
+    const glossToCode = {};
+    const glossList = [];
+
+    dictionaryData.split('\n').forEach(line => {
+      if(line.trim() === "") return;
+      const [code, glosses] = line.split('\t');
+      glosses.split(',').forEach(word => {
+          // Normalize: lower-case and remove annotations like "-(to)"
+          let cleaned = word.trim().toLowerCase().replace(/-\(.*\)/, '');
+          glossToCode[cleaned] = code;
+          glossList.push(cleaned);
+      });
+    });
+
+    // Fallback fuzzy matching using Levenshtein distance.
+    function levenshtein(a, b) {
+      const dp = Array(a.length + 1).fill(null).map(() => Array(b.length + 1).fill(0));
+      for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+      for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+      for (let i = 1; i <= a.length; i++) {
+        for (let j = 1; j <= b.length; j++) {
+          dp[i][j] = Math.min(
+            dp[i - 1][j] + 1,
+            dp[i][j - 1] + 1,
+            dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+          );
+        }
+      }
+      return dp[a.length][b.length];
+    }
+
+    function findBestMatch(word) {
+      let bestMatch = null;
+      let bestDistance = Infinity;
+      // Set a threshold (this may be adjusted based on your needs)
+      const threshold = Math.max(2, Math.floor(word.length / 2));
+      glossList.forEach(gloss => {
+        const distance = levenshtein(word, gloss);
+        if (distance < bestDistance && distance <= threshold) {
+          bestDistance = distance;
+          bestMatch = gloss;
+        }
+      });
+      return bestMatch;
+    }
+
+    // Use Compromise.js to normalize each word (e.g. lemmatize or singularize)
+    function normalizeWord(word) {
+      let doc = nlp(word);
+      // Try to normalize verbs (to their infinitive form)
+      let verbForm = doc.verbs().toInfinitive().out('text');
+      if (verbForm && verbForm !== "") {
+        return verbForm.toLowerCase();
+      }
+      // Normalize nouns (to singular form)
+      let nounForm = doc.nouns().toSingular().out('text');
+      if (nounForm && nounForm !== "") {
+        return nounForm.toLowerCase();
+      }
+      // Default to lowercasing the word.
+      return word.toLowerCase();
+    }
+
+    function translate() {
+      const inputText = document.getElementById('inputText').value;
+      // Split by whitespace (this can be enhanced for better punctuation handling)
+      const words = inputText.split(/\s+/);
+      let outputHTML = "";
+      words.forEach(word => {
+        // Remove punctuation from the original word for processing.
+        let cleanedOriginal = word.replace(/[.,!?]/g, '');
+        // Use NLP normalization to get the base form.
+        let normalized = normalizeWord(cleanedOriginal);
+        let code = glossToCode[normalized];
+        // If an exact match isn't found using NLP, fallback to fuzzy matching.
+        if (!code) {
+          const bestMatch = findBestMatch(normalized);
+          if (bestMatch) {
+            code = glossToCode[bestMatch];
+          }
+        }
+        if (code) {
+          // Display the corresponding SVG image from the bliss_svg_id folder.
+          outputHTML += `<img src="bliss_svg_id/${code}.svg" alt="${cleanedOriginal}" title="${cleanedOriginal}"> `;
+        } else {
+          // If no translation is found, output the original word.
+          outputHTML += `<span>${word}</span> `;
+        }
+      });
+      document.getElementById('output').innerHTML = outputHTML;
+    }
+  </script>
+</body>
+</html>
 
