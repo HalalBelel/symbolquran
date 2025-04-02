@@ -49,7 +49,7 @@
   <p>Enter your phrase below and click "Translate" to see the corresponding Bliss symbols.</p>
   <textarea id="inputText" placeholder="Enter your phrase here..."></textarea>
   <br>
-  <button onclick="translate()">Translate</button>
+  <button id="translateButton" onclick="translate()" disabled>Translate</button>
   <div id="output"></div>
 
   <div id="versionContainer">
@@ -59,7 +59,6 @@
 
   <!-- Include the lightweight NLP library, Compromise.js -->
   <script src="https://unpkg.com/compromise"></script>
-
   <script>
     // Author update and version stamp.
     const AUTHOR_UPDATE = "Notes: Kindly send feedback to info@onewordquran.com, may Allah bless the contributors";
@@ -70,27 +69,43 @@
       document.getElementById("updatesBox").textContent = AUTHOR_UPDATE + "\n" + versionText;
     });
 
-    // Sample dictionary data (each line: code[TAB]gloss1,gloss2,...)
-    // Added "icecream" -> code 20000 for demonstration
-    const dictionaryData = `12584	artificial_respiration
-12585	give_artificial_respiration,resuscitate,revive-(to)
-12586	ashes
-20000	icecream`;
+    // Globals for dictionary mapping
+    let glossToCode = {};
+    let glossList = [];
 
-    // Build a mapping from each cleaned gloss to its corresponding code.
-    const glossToCode = {};
-    const glossList = [];
+    // Load dictionary file dynamically.
+    const dictionaryFile = "BCI-AV_SKOG_2024-10-30_ID_to_gloss_map.txt"; // Update the path if needed.
+    fetch(dictionaryFile)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error("Failed to load dictionary file.");
+        }
+        return response.text();
+      })
+      .then(text => {
+        processDictionaryData(text);
+        // Enable the translate button once the dictionary is loaded.
+        document.getElementById("translateButton").disabled = false;
+        console.log("Dictionary loaded successfully.");
+      })
+      .catch(err => {
+        console.error("Error loading dictionary:", err);
+        document.getElementById("output").innerHTML = `<span>Error loading dictionary. Check the console for details.</span>`;
+      });
 
-    dictionaryData.split('\n').forEach(line => {
-      if(line.trim() === "") return;
-      const [code, glosses] = line.split('\t');
-      glosses.split(',').forEach(word => {
+    // Process dictionary text data (each line: code[TAB]gloss1,gloss2,...)
+    function processDictionaryData(dictionaryData) {
+      dictionaryData.split('\n').forEach(line => {
+        if(line.trim() === "") return;
+        const [code, glosses] = line.split('\t');
+        glosses.split(',').forEach(word => {
           // Normalize: lower-case and remove annotations like "-(to)"
           let cleaned = word.trim().toLowerCase().replace(/-\(.*\)/, '');
           glossToCode[cleaned] = code;
           glossList.push(cleaned);
+        });
       });
-    });
+    }
 
     // Fallback fuzzy matching using Levenshtein distance.
     function levenshtein(a, b) {
@@ -112,7 +127,7 @@
     function findBestMatch(word) {
       let bestMatch = null;
       let bestDistance = Infinity;
-      // Set a threshold (this may be adjusted based on your needs)
+      // Set a threshold (adjustable as needed)
       const threshold = Math.max(2, Math.floor(word.length / 2));
       glossList.forEach(gloss => {
         const distance = levenshtein(word, gloss);
@@ -127,17 +142,16 @@
     // Use Compromise.js to normalize each word (e.g. lemmatize or singularize)
     function normalizeWord(word) {
       let doc = nlp(word);
-      // Try to normalize verbs (to their infinitive form)
+      // Normalize verbs to their infinitive form.
       let verbForm = doc.verbs().toInfinitive().out('text');
       if (verbForm && verbForm !== "") {
         return verbForm.toLowerCase();
       }
-      // Normalize nouns (to singular form)
+      // Normalize nouns to their singular form.
       let nounForm = doc.nouns().toSingular().out('text');
       if (nounForm && nounForm !== "") {
         return nounForm.toLowerCase();
       }
-      // Default to lowercasing the word.
       return word.toLowerCase();
     }
 
@@ -147,17 +161,13 @@
         document.getElementById('output').innerHTML = "<span>No input provided.</span>";
         return;
       }
-      // Split by whitespace
       const words = inputText.split(/\s+/);
       let outputHTML = "";
 
       words.forEach(word => {
-        // Remove punctuation from the original word for processing.
         let cleanedOriginal = word.replace(/[.,!?]/g, '');
-        // Use NLP normalization to get the base form.
         let normalized = normalizeWord(cleanedOriginal);
         let code = glossToCode[normalized];
-        // If an exact match isn't found using NLP, fallback to fuzzy matching.
         if (!code) {
           const bestMatch = findBestMatch(normalized);
           if (bestMatch) {
@@ -165,10 +175,8 @@
           }
         }
         if (code) {
-          // Display the corresponding SVG image from the bliss_svg_id folder.
           outputHTML += `<img src="bliss_svg_id/${code}.svg" alt="${cleanedOriginal}" title="${cleanedOriginal}"> `;
         } else {
-          // If no translation is found, output the original word.
           outputHTML += `<span>${word}</span> `;
         }
       });
