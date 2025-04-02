@@ -2,17 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>English to Bliss Translator – Strict Numeric Mode</title>
+  <title>English to Bliss Translator – Dual Input Mode</title>
   <style>
     body {
       font-family: sans-serif;
       margin: 2rem;
       background: #f9f9f9;
     }
-    textarea {
+    textarea, input[type="text"] {
       width: 100%;
-      height: 100px;
       font-size: 1rem;
+      margin-bottom: 1rem;
+      padding: 0.5rem;
     }
     #output {
       margin-top: 1rem;
@@ -27,7 +28,7 @@
       text-align: center;
       display: inline-block;
     }
-    /* Constrain the SVG image to a max height while preserving its aspect ratio */
+    /* Constrain SVG images to a max height while preserving aspect ratio */
     #output img {
       max-height: 50px;
       height: auto;
@@ -43,6 +44,7 @@
       padding: 0.5rem 1rem;
       font-size: 1rem;
       cursor: pointer;
+      margin-bottom: 1rem;
     }
     #versionContainer {
       margin-top: 2rem;
@@ -55,16 +57,15 @@
   </style>
 </head>
 <body>
-  <h1>English to Bliss Translator – Strict Numeric Mode</h1>
+  <h1>English to Bliss Translator – Dual Input Mode</h1>
   <p>
-    Enter your phrase and click “Translate” to see the corresponding Bliss symbols.
-    <br>
-    The translator first searches the BCI mapping (after cleaning and splitting the text file).
-    If no exact match is found, it uses the synonym/compound dictionaries (svg_dict.json and comp_dict.json)
-    to get a candidate gloss and then does one final search in def_dict.json (with a strict threshold)
-    before defaulting to a question-mark (<code>8485.svg</code>).
+    Enter either an English phrase <strong>or</strong> numeric codes (separated by whitespace).
+    Numeric input takes precedence if both are filled.
   </p>
-  <textarea id="inputText" placeholder="Enter your phrase here..."></textarea>
+  <!-- Input box for English phrase -->
+  <textarea id="inputEnglish" placeholder="Enter English phrase here..."></textarea>
+  <!-- Input box for numeric codes -->
+  <input type="text" id="inputNumbers" placeholder="Or enter numeric codes (e.g. 12910 12911 ...)">
   <br>
   <button id="translateButton" disabled>Translate</button>
   <div id="output"></div>
@@ -73,7 +74,7 @@
     <div id="updatesBox"></div>
   </div>
 
-  <!-- Include Compromise.js for basic NLP normalization -->
+  <!-- Include Compromise.js for NLP normalization -->
   <script src="https://unpkg.com/compromise"></script>
   <script>
     // Version stamp & author info.
@@ -86,15 +87,16 @@
     });
 
     // Global dictionaries.
-    let defDict = {};   // from def_dict.json: normalized word -> definition
-    let svgDict = {};   // from svg_dict.json: keys (possibly comma-separated) → symbol filename (not used directly for numeric mapping)
+    let defDict = {};   // from def_dict.json: normalized word → definition
+    let svgDict = {};   // from svg_dict.json: keys (possibly comma-separated) → symbol filename (we use keys for candidate gloss)
     let compDict = {};  // from comp_dict.json: keys → array of subcomponent words
-    let bciMap = {};    // from BCI-AV_SKOG_2024-10-30_ID_to_gloss_map.txt: normalized gloss -> numeric code
+    let bciMap = {};    // from BCI-AV_SKOG_2024-10-30_ID_to_gloss_map.txt: normalized gloss → numeric code
+    let reverseBciMap = {}; // reverse mapping: numeric code → candidate English (first encountered)
 
-    const DEFAULT_CODE = "8485";       // Default numeric code (question mark)
+    const DEFAULT_CODE = "8485";       // Default numeric code for question_mark
     const DEFAULT_CAPTION = "question_mark";
 
-    // Load def_dict.json, svg_dict.json, comp_dict.json, and the BCI mapping file concurrently.
+    // Load JSON files and the BCI text file concurrently.
     Promise.all([
       fetch("def_dict.json").then(r => r.ok ? r.json() : Promise.resolve({})),
       fetch("svg_dict.json").then(r => r.ok ? r.json() : Promise.resolve({})),
@@ -120,7 +122,7 @@
     });
 
     // Process the BCI text file.
-    // Each line is in the format: code<TAB>gloss1,gloss2,...
+    // Each line: code<TAB>gloss1,gloss2,...
     function processBciData(text) {
       text.split("\n").forEach(line => {
         const trimmed = line.trim();
@@ -130,23 +132,28 @@
         const code = parts[0].trim();
         const glosses = parts[1].trim();
         glosses.split(",").forEach(rawGloss => {
-          // Clean the gloss: remove content in parentheses and underscores.
           let cleaned = rawGloss.toLowerCase()
-                                .replace(/-\(.*?\)/g, "") // remove trailing annotations like -(to)
-                                .replace(/\(.*?\)/g, "")   // remove any parentheses content (e.g., (bci))
-                                .replace(/_/g, " ")
+                                .replace(/-\(.*?\)/g, "")  // remove trailing annotations like -(to)
+                                .replace(/\(.*?\)/g, "")    // remove parentheses (e.g., (bci))
+                                .replace(/_/g, " ")         // underscores to spaces
                                 .trim();
-          if (cleaned && !bciMap[cleaned]) {
-            bciMap[cleaned] = code;
+          if (cleaned) {
+            if (!bciMap[cleaned]) {
+              bciMap[cleaned] = code;
+            }
+            // Build reverse mapping (first encountered candidate for a numeric code)
+            if (!reverseBciMap[code]) {
+              reverseBciMap[code] = cleaned;
+            }
           }
         });
       });
       console.log("Processed BCI Map:", bciMap);
+      console.log("Reverse BCI Map:", reverseBciMap);
     }
 
-    // Build a mapping from svg_dict.json.
-    // For each key (which may be comma-separated), split and normalize.
-    let svgMapping = {};  // key: normalized word, value: candidate gloss (here we simply use the normalized word)
+    // Build mapping from svg_dict.json.
+    let svgMapping = {};  // key: normalized word, value: candidate gloss
     function buildSvgMapping() {
       for (const key in svgDict) {
         const words = key.split(",").map(s => s.trim().toLowerCase());
@@ -180,7 +187,7 @@
       return word.toLowerCase();
     }
 
-    // Levenshtein distance function.
+    // Levenshtein distance for final def_dict fallback.
     function levenshtein(a, b) {
       const dp = Array(a.length + 1).fill(null).map(() => Array(b.length + 1).fill(0));
       for (let i = 0; i <= a.length; i++) dp[i][0] = i;
@@ -197,8 +204,7 @@
       return dp[a.length][b.length];
     }
 
-    // Final search using def_dict as a fallback.
-    // It searches defDict keys for one that is almost identical (distance <= 1) to candidate.
+    // Final search using def_dict: check for a key nearly identical to candidate (threshold 1).
     function finalDefSearch(candidate) {
       let bestKey = null;
       let bestDistance = Infinity;
@@ -212,9 +218,7 @@
       return (bestDistance <= 1) ? bestKey : null;
     }
 
-    // First, try a direct lookup in the BCI mapping using the normalized word.
-    // If not found, use the candidate from the synonym/compound dictionaries.
-    // Then, if still not found, do a final search in def_dict.
+    // For English mode: attempt direct lookup in BCI mapping first.
     function getFinalCode(word) {
       const cleaned = word.replace(/[.,!?]/g, "");
       const normalized = normalizeWord(cleaned);
@@ -239,7 +243,7 @@
       if (svgMapping[normalized]) {
         return svgMapping[normalized];
       }
-      // 2. Check compound mapping: if the normalized word exists in compMapping and all subcomponents exist.
+      // 2. Check compound mapping.
       if (compMapping[normalized]) {
         const comps = compMapping[normalized];
         let validComponents = [];
@@ -255,15 +259,15 @@
           return validComponents.join(" ");
         }
       }
-      // 3. Fallback: return the normalized word.
+      // 3. Fallback.
       return normalized;
     }
 
-    // Translate the user input.
-    function translate() {
-      const inputText = document.getElementById("inputText").value.trim();
+    // Translation in English mode.
+    function translateEnglish() {
+      const inputText = document.getElementById("inputEnglish").value.trim();
       if (!inputText) {
-        document.getElementById("output").innerHTML = "<span>No input provided.</span>";
+        document.getElementById("output").innerHTML = "<span>No English input provided.</span>";
         return;
       }
       const words = inputText.split(/\s+/);
@@ -272,7 +276,6 @@
       words.forEach(word => {
         const candidate = getCandidate(word);
         const code = getFinalCode(word);
-        // Use candidate to fetch a definition from defDict (if available).
         let definition = defDict[candidate] || "";
         let captionText = candidate;
         if (definition) {
@@ -288,7 +291,48 @@
       document.getElementById("output").innerHTML = outputHTML;
     }
 
-    // Attach the Translate button click event.
+    // Translation in Numeric mode.
+    function translateNumeric() {
+      const inputNumbers = document.getElementById("inputNumbers").value.trim();
+      if (!inputNumbers) {
+        document.getElementById("output").innerHTML = "<span>No numeric input provided.</span>";
+        return;
+      }
+      const tokens = inputNumbers.split(/\s+/);
+      let outputHTML = "";
+      tokens.forEach(token => {
+        const code = token.replace(/[.,!?]/g, "").trim();
+        // Get candidate english from reverseBciMap, if available.
+        const candidate = reverseBciMap[code] || code;
+        const definition = defDict[candidate] || "";
+        let captionText = candidate;
+        if (definition) {
+          captionText += "<br><em>" + definition + "</em>";
+        }
+        outputHTML += `
+          <figure>
+            <img src="bliss_svg_id/${code}.svg" alt="${code}" title="${code}">
+            <figcaption>${captionText}</figcaption>
+          </figure>
+        `;
+      });
+      document.getElementById("output").innerHTML = outputHTML;
+    }
+
+    // Main translate function: uses numeric mode if its input box is not blank; otherwise, uses English mode.
+    function translate() {
+      const numericInput = document.getElementById("inputNumbers").value.trim();
+      const englishInput = document.getElementById("inputEnglish").value.trim();
+      if (numericInput) {
+        translateNumeric();
+      } else if (englishInput) {
+        translateEnglish();
+      } else {
+        document.getElementById("output").innerHTML = "<span>Please enter a phrase or numeric codes.</span>";
+      }
+    }
+
+    // Attach the click event listener.
     document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("translateButton").addEventListener("click", translate);
     });
