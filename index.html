@@ -32,6 +32,15 @@
     button {
       padding: 0.5rem 1rem;
       font-size: 1rem;
+      cursor: pointer;
+    }
+    #versionContainer {
+      margin-top: 2rem;
+      font-size: 0.9rem;
+      color: #666;
+    }
+    #updatesBox {
+      white-space: pre-wrap;
     }
   </style>
 </head>
@@ -43,13 +52,30 @@
   <button onclick="translate()">Translate</button>
   <div id="output"></div>
 
+  <div id="versionContainer">
+    <div id="versionInfo"></div>
+    <div id="updatesBox"></div>
+  </div>
+
   <!-- Include the lightweight NLP library, Compromise.js -->
   <script src="https://unpkg.com/compromise"></script>
+
   <script>
+    // Author update and version stamp.
+    const AUTHOR_UPDATE = "Notes: Kindly send feedback to info@onewordquran.com, may Allah bless the contributors";
+    const modifiedDate = new Date(document.lastModified);
+    const versionText = "Version: " + modifiedDate.toLocaleDateString("en-AU") + " " + modifiedDate.toLocaleTimeString("en-AU");
+    document.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("versionInfo").textContent = versionText;
+      document.getElementById("updatesBox").textContent = AUTHOR_UPDATE + "\n" + versionText;
+    });
+
     // Sample dictionary data (each line: code[TAB]gloss1,gloss2,...)
+    // Added "icecream" -> code 20000 for demonstration
     const dictionaryData = `12584	artificial_respiration
 12585	give_artificial_respiration,resuscitate,revive-(to)
-12586	ashes`;
+12586	ashes
+20000	icecream`;
 
     // Build a mapping from each cleaned gloss to its corresponding code.
     const glossToCode = {};
@@ -116,10 +142,15 @@
     }
 
     function translate() {
-      const inputText = document.getElementById('inputText').value;
-      // Split by whitespace (this can be enhanced for better punctuation handling)
+      const inputText = document.getElementById('inputText').value.trim();
+      if (!inputText) {
+        document.getElementById('output').innerHTML = "<span>No input provided.</span>";
+        return;
+      }
+      // Split by whitespace
       const words = inputText.split(/\s+/);
       let outputHTML = "";
+
       words.forEach(word => {
         // Remove punctuation from the original word for processing.
         let cleanedOriginal = word.replace(/[.,!?]/g, '');
@@ -146,4 +177,3 @@
   </script>
 </body>
 </html>
-
