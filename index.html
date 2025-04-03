@@ -15,6 +15,7 @@
       margin-bottom: 1rem;
       padding: 0.5rem;
     }
+    /* Overall container holds each word-cell in a row */
     #output {
       margin-top: 1rem;
       display: flex;
@@ -22,23 +23,54 @@
       gap: 10px;
       align-items: flex-start;
     }
+    /* Each word becomes a cell with multiple rows (stacked vertically) */
+    .word-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 5px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      background: #fff;
+    }
     /* Each symbol is shown in a figure with a caption */
-    #output figure {
+    .word-cell figure {
       margin: 0;
       text-align: center;
-      display: inline-block;
     }
     /* Constrain SVG images to a max height while preserving aspect ratio */
-    #output img {
+    .word-cell img {
       max-height: 50px;
       height: auto;
       width: auto;
       vertical-align: middle;
     }
-    #output figcaption {
+    .word-cell figcaption {
       font-size: 0.8rem;
       margin-top: 2px;
       color: #333;
+    }
+    /* Component breakdown row styling */
+    .components {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .components figure {
+      margin: 0;
+      text-align: center;
+    }
+    .components img {
+      max-height: 30px;
+      height: auto;
+      width: auto;
+      vertical-align: middle;
+    }
+    .components figcaption {
+      font-size: 0.7rem;
+      margin-top: 2px;
+      color: #555;
     }
     button {
       padding: 0.5rem 1rem;
@@ -88,13 +120,13 @@
 
     // Global dictionaries.
     let defDict = {};   // from def_dict.json: normalized word → definition
-    let svgDict = {};   // from svg_dict.json: keys (possibly comma-separated) → symbol filename (we use keys for candidate gloss)
+    let svgDict = {};   // from svg_dict.json: keys (possibly comma-separated) → symbol filename
     let compDict = {};  // from comp_dict.json: keys → array of subcomponent words
     let bciMap = {};    // from BCI-AV_SKOG_2024-10-30_ID_to_gloss_map.txt: normalized gloss → numeric code
     let reverseBciMap = {}; // reverse mapping: numeric code → candidate English (first encountered)
+    let bciSynonyms = {};   // mapping numeric code → synonyms (comma-separated string)
 
     const DEFAULT_CODE = "8485";       // Default numeric code for question_mark
-    const DEFAULT_CAPTION = "question_mark";
 
     // Load JSON files and the BCI text file concurrently.
     Promise.all([
@@ -131,17 +163,18 @@
         if (parts.length < 2) return;
         const code = parts[0].trim();
         const glosses = parts[1].trim();
+        // Store synonyms for the code.
+        bciSynonyms[code] = glosses;
         glosses.split(",").forEach(rawGloss => {
           let cleaned = rawGloss.toLowerCase()
-                                .replace(/-\(.*?\)/g, "")  // remove trailing annotations like -(to)
-                                .replace(/\(.*?\)/g, "")    // remove parentheses (e.g., (bci))
-                                .replace(/_/g, " ")         // underscores to spaces
+                                .replace(/-\(.*?\)/g, "")
+                                .replace(/\(.*?\)/g, "")
+                                .replace(/_/g, " ")
                                 .trim();
           if (cleaned) {
             if (!bciMap[cleaned]) {
               bciMap[cleaned] = code;
             }
-            // Build reverse mapping (first encountered candidate for a numeric code)
             if (!reverseBciMap[code]) {
               reverseBciMap[code] = cleaned;
             }
@@ -239,11 +272,9 @@
     function getCandidate(word) {
       const cleaned = word.replace(/[.,!?]/g, "");
       const normalized = normalizeWord(cleaned);
-      // 1. Check direct match from svgMapping.
       if (svgMapping[normalized]) {
         return svgMapping[normalized];
       }
-      // 2. Check compound mapping.
       if (compMapping[normalized]) {
         const comps = compMapping[normalized];
         let validComponents = [];
@@ -259,8 +290,55 @@
           return validComponents.join(" ");
         }
       }
-      // 3. Fallback.
       return normalized;
+    }
+
+    /**
+     * Renders the breakdown of a word recursively up to 5 levels deep,
+     * skipping any word that was already visited to avoid cycles.
+     * @param {string} word - The word to break down.
+     * @param {number} depth - The current recursion depth.
+     * @param {Set} visited - A set of words we've already visited.
+     * @returns {string} - The HTML for this word's breakdown rows.
+     */
+    function renderBreakdown(word, depth = 0, visited = new Set()) {
+      const MAX_DEPTH = 5;
+      if (depth >= MAX_DEPTH) return "";
+      const norm = normalizeWord(word);
+
+      // If we've already visited this word, skip to avoid cycles.
+      if (visited.has(norm)) {
+        return "";
+      }
+      visited.add(norm);
+
+      // If there's no entry in compMapping, nothing to break down.
+      if (!compMapping[norm]) {
+        return "";
+      }
+
+      // Show immediate subcomponents in a row.
+      let html = `<div class="components">`;
+      compMapping[norm].forEach(comp => {
+        const compCode = getFinalCode(comp);
+        html += `
+          <figure>
+            <img src="bliss_svg_id/${compCode}.svg" alt="${comp}" title="${comp}">
+            <figcaption>
+              ${comp}<br>
+              ID: ${compCode}
+            </figcaption>
+          </figure>
+        `;
+      });
+      html += `</div>`;
+
+      // Recursively show each subcomponent's own breakdown, if any.
+      compMapping[norm].forEach(comp => {
+        html += renderBreakdown(comp, depth + 1, visited);
+      });
+
+      return html;
     }
 
     // Translation in English mode.
@@ -274,19 +352,30 @@
       let outputHTML = "";
 
       words.forEach(word => {
+        // Each top-level word has its own visited set so that each new word
+        // can show its breakdown, even if previous words used some of the same subcomponents.
+        const visited = new Set();
         const candidate = getCandidate(word);
         const code = getFinalCode(word);
-        let definition = defDict[candidate] || "";
-        let captionText = candidate;
-        if (definition) {
-          captionText += "<br><em>" + definition + "</em>";
-        }
-        outputHTML += `
+        const definition = defDict[candidate] || "";
+        const synonyms = bciSynonyms[code] || "";
+
+        let cellHTML = `<div class="word-cell">`;
+        cellHTML += `
           <figure>
             <img src="bliss_svg_id/${code}.svg" alt="${word}" title="${word}">
-            <figcaption>${captionText}</figcaption>
+            <figcaption>
+              ${candidate}<br>
+              ID: ${code}<br>
+              Synonyms: ${synonyms}<br>
+              Definition: ${definition}
+            </figcaption>
           </figure>
         `;
+        // Append recursive breakdown rows, if any.
+        cellHTML += renderBreakdown(word, 0, visited);
+        cellHTML += `</div>`;
+        outputHTML += cellHTML;
       });
       document.getElementById("output").innerHTML = outputHTML;
     }
@@ -300,21 +389,30 @@
       }
       const tokens = inputNumbers.split(/\s+/);
       let outputHTML = "";
+
       tokens.forEach(token => {
+        const visited = new Set();
         const code = token.replace(/[.,!?]/g, "").trim();
-        // Get candidate english from reverseBciMap, if available.
         const candidate = reverseBciMap[code] || code;
         const definition = defDict[candidate] || "";
-        let captionText = candidate;
-        if (definition) {
-          captionText += "<br><em>" + definition + "</em>";
-        }
-        outputHTML += `
+        const synonyms = bciSynonyms[code] || "";
+
+        let cellHTML = `<div class="word-cell">`;
+        cellHTML += `
           <figure>
             <img src="bliss_svg_id/${code}.svg" alt="${code}" title="${code}">
-            <figcaption>${captionText}</figcaption>
+            <figcaption>
+              ${candidate}<br>
+              ID: ${code}<br>
+              Synonyms: ${synonyms}<br>
+              Definition: ${definition}
+            </figcaption>
           </figure>
         `;
+        // Append recursive breakdown rows for numeric mode.
+        cellHTML += renderBreakdown(candidate, 0, visited);
+        cellHTML += `</div>`;
+        outputHTML += cellHTML;
       });
       document.getElementById("output").innerHTML = outputHTML;
     }
