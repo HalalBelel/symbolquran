@@ -293,31 +293,51 @@
       return normalized;
     }
 
-    // Recursive function to render breakdown rows with a depth limit.
-    function renderBreakdown(word, depth = 0) {
+    /**
+     * Renders the breakdown of a word recursively up to 5 levels deep,
+     * skipping any word that was already visited to avoid cycles.
+     * @param {string} word - The word to break down.
+     * @param {number} depth - The current recursion depth.
+     * @param {Set} visited - A set of words we've already visited.
+     * @returns {string} - The HTML for this word's breakdown rows.
+     */
+    function renderBreakdown(word, depth = 0, visited = new Set()) {
       const MAX_DEPTH = 5;
       if (depth >= MAX_DEPTH) return "";
-      let html = "";
       const norm = normalizeWord(word);
-      if (compMapping[norm]) {
-        html += `<div class="components">`;
-        compMapping[norm].forEach(comp => {
-          const compCode = getFinalCode(comp);
-          html += `
-            <figure>
-              <img src="bliss_svg_id/${compCode}.svg" alt="${comp}" title="${comp}">
-              <figcaption>
-                ${comp}<br>
-                ID: ${compCode}
-              </figcaption>
-            </figure>
-          `;
-        });
-        html += `</div>`;
-        compMapping[norm].forEach(comp => {
-          html += renderBreakdown(comp, depth + 1);
-        });
+
+      // If we've already visited this word, skip to avoid cycles.
+      if (visited.has(norm)) {
+        return "";
       }
+      visited.add(norm);
+
+      // If there's no entry in compMapping, nothing to break down.
+      if (!compMapping[norm]) {
+        return "";
+      }
+
+      // Show immediate subcomponents in a row.
+      let html = `<div class="components">`;
+      compMapping[norm].forEach(comp => {
+        const compCode = getFinalCode(comp);
+        html += `
+          <figure>
+            <img src="bliss_svg_id/${compCode}.svg" alt="${comp}" title="${comp}">
+            <figcaption>
+              ${comp}<br>
+              ID: ${compCode}
+            </figcaption>
+          </figure>
+        `;
+      });
+      html += `</div>`;
+
+      // Recursively show each subcomponent's own breakdown, if any.
+      compMapping[norm].forEach(comp => {
+        html += renderBreakdown(comp, depth + 1, visited);
+      });
+
       return html;
     }
 
@@ -332,10 +352,14 @@
       let outputHTML = "";
 
       words.forEach(word => {
+        // Each top-level word has its own visited set so that each new word
+        // can show its breakdown, even if previous words used some of the same subcomponents.
+        const visited = new Set();
         const candidate = getCandidate(word);
         const code = getFinalCode(word);
         const definition = defDict[candidate] || "";
         const synonyms = bciSynonyms[code] || "";
+
         let cellHTML = `<div class="word-cell">`;
         cellHTML += `
           <figure>
@@ -349,7 +373,7 @@
           </figure>
         `;
         // Append recursive breakdown rows, if any.
-        cellHTML += renderBreakdown(word);
+        cellHTML += renderBreakdown(word, 0, visited);
         cellHTML += `</div>`;
         outputHTML += cellHTML;
       });
@@ -367,10 +391,12 @@
       let outputHTML = "";
 
       tokens.forEach(token => {
+        const visited = new Set();
         const code = token.replace(/[.,!?]/g, "").trim();
         const candidate = reverseBciMap[code] || code;
         const definition = defDict[candidate] || "";
         const synonyms = bciSynonyms[code] || "";
+
         let cellHTML = `<div class="word-cell">`;
         cellHTML += `
           <figure>
@@ -384,7 +410,7 @@
           </figure>
         `;
         // Append recursive breakdown rows for numeric mode.
-        cellHTML += renderBreakdown(candidate);
+        cellHTML += renderBreakdown(candidate, 0, visited);
         cellHTML += `</div>`;
         outputHTML += cellHTML;
       });
