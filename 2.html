@@ -1,0 +1,889 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f8fa">
+  <title>SymbolQuran · Smart English → Blissymbolics</title>
+  <style>
+    :root { color-scheme:light; --ink:#142134;--muted:#667489;--blue:#245bea;--pale:#edf2ff;--line:#dfe5ed;--bg:#f7f8fa;--white:#fff;--green:#137a52;--amber:#9a5d06;--red:#a53039; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+    button,input,textarea,select { font:inherit; }
+    button { cursor:pointer; }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,summary:focus-visible { outline:3px solid #91b2ff;outline-offset:2px; }
+    header { border-bottom:1px solid var(--line); background:#fff; }
+    .wrap { max-width:1130px; margin:auto; padding:22px 24px; }
+    .top { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+    .eyebrow { color:var(--blue); font-size:12px; font-weight:750; text-transform:uppercase; letter-spacing:.12em; }
+    h1 { margin:4px 0 5px; font-size:clamp(24px,3.5vw,35px); letter-spacing:-.035em; line-height:1.1; }
+    .subtitle { margin:0; color:var(--muted); }
+    .status { display:inline-flex; align-items:center; gap:7px; background:#f1f4f8; border:1px solid var(--line); border-radius:99px; color:var(--muted); font-size:12px; font-weight:650; white-space:nowrap; padding:7px 11px; }
+    .dot { width:8px;height:8px;background:#efae38;border-radius:50%; display:inline-block; }
+    .status.ready .dot { background:#27a36c; }
+    .status.error .dot { background:#df5c69; }
+    main.wrap { padding-top:22px; }
+    .panel { border:1px solid var(--line);border-radius:16px; background:white;box-shadow:0 3px 12px #14213408; }
+    .editor { padding:20px; }
+    .section-title { font-size:13px; font-weight:750; margin:0 0 10px; }
+    textarea { display:block;width:100%;min-height:115px;resize:vertical;border:1px solid #ccd5e0;border-radius:10px;padding:14px 15px; color:var(--ink); background:#fff; line-height:1.6; }
+    input[type=text],input[type=url] { width:100%; min-height:41px; border:1px solid #ccd5e0;border-radius:9px;padding:8px 11px;background:white; }
+    .row { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+    .button { border:1px solid var(--line); border-radius:9px; min-height:39px; padding:8px 14px; background:#fff; color:var(--ink); font-weight:650; }
+    .primary { background:var(--blue); border-color:var(--blue); color:white; }
+    .secondary { color:#2756cc;background:var(--pale);border-color:#d9e3ff; }
+    .small { font-size:12px;min-height:30px;padding:5px 10px; }
+    .muted { color:var(--muted); }
+    .hint { font-size:12px;color:var(--muted);margin:7px 0 0; }
+    details.utility { margin-top:14px; padding:10px 12px; border:1px solid var(--line); border-radius:9px; }
+    details.utility summary { cursor:pointer;font-size:13px;font-weight:700; }
+    details.utility .inside { padding-top:12px; }
+    .settings { display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px; }
+    .settings label { font-size:12px;font-weight:650;display:block;margin-bottom:6px; }
+    .settings input[type=checkbox] { width:auto; margin-right:5px; }
+    .section-header { display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:24px 0 10px; }
+    h2 {font-size:18px; margin:0;letter-spacing:-.02em;}
+    .summary { font-size:13px;color:var(--muted); }
+    .grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:11px; }
+    .word-cell { min-width:0; background:#fff;border:1px solid var(--line);border-radius:13px; padding:14px; display:flex;flex-direction:column;gap:9px; }
+    .word-cell.uncertain { border-color:#ead7b7;background:#fffdf9; }
+    .word-cell.unknown { border-color:#ebc7cc;background:#fffcfc; }
+    .cell-top { display:flex;align-items:center;justify-content:space-between;gap:8px; }
+    .input-word { font-size:14px;font-weight:750; overflow-wrap:anywhere; }
+    .pill { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; border-radius:99px;padding:3px 7px;white-space:nowrap; background:#e9f5ee;color:#14714e; }
+    .pill.uncertain {background:#fff0d6;color:#895400;}
+    .pill.unknown { background:#ffe8eb;color:#a3313c; }
+    .symbol-stage { min-height:92px; display:flex;align-items:center;justify-content:center; gap:10px; flex-wrap:wrap;background:#f8faff;border:1px solid #edf0f6;border-radius:10px;padding:12px 8px; }
+    .symbol-stage img { display:block;max-width:160px;max-height:76px;width:auto;height:auto;object-fit:contain; }
+    .symbol-stage .part { text-align:center; max-width:165px; }
+    .symbol-stage .part small {font-size:10px;color:var(--muted);display:block;}
+    .missing-symbol { color:#8a98a8;font-weight:800;font-size:26px; }
+    .gloss { font-weight:750;font-size:14px;overflow-wrap:anywhere; }
+    .detail { font-size:12px;color:var(--muted);overflow-wrap:anywhere; }
+    .detail strong {color:var(--ink);font-weight:650;}
+    .alternatives {display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+    .alternatives button { border:1px solid #d5ddec;border-radius:7px;background:white;font-size:12px;padding:5px 8px;max-width:100%;text-align:left;overflow-wrap:anywhere; }
+    .alternatives button:hover {border-color:var(--blue);background:var(--pale);}
+    .inside-note { font-size:11px;color:var(--muted); }
+    .definition { white-space:normal; }
+    details.breakdown { border-top:1px solid var(--line); padding-top:8px; font-size:11px; }
+    details.breakdown summary { cursor:pointer;font-weight:700;color:#466283; }
+    .pieces { display:flex; flex-wrap:wrap;gap:9px;margin-top:9px; }
+    .piece {display:flex;flex-direction:column;align-items:center; max-width:95px;text-align:center;font-size:10px;}
+    .piece img {height:32px;max-width:90px;width:auto;object-fit:contain;}
+    .empty { padding:34px;text-align:center;color:var(--muted);font-size:14px; }
+    footer {padding:28px 24px 45px;color:var(--muted);font-size:12px;max-width:1130px;margin:auto;}
+    footer a {color:#325dba;}
+    #aiInfo {font-size:12px;color:var(--muted);}
+    .ai-prepare {border:1px solid #d5e0ef;border-radius:10px;background:#f8faff;padding:12px;margin-top:10px;}
+    .ai-prepare progress {width:100%;height:8px;accent-color:var(--blue);margin:7px 0;}
+    .ai-prepare .row {gap:8px;}
+    #localAIStatus {font-size:12px;color:var(--muted);overflow-wrap:anywhere;}
+    #aiProgress[hidden] {display:none;}
+    #stopLocalAI[hidden] {display:none;}
+    .errorbox {color:var(--red);padding:14px 16px;border:1px solid #ecc5ca;background:#fff8f9;border-radius:9px;}
+    @media(max-width:600px){.wrap{padding-left:13px;padding-right:13px}.editor{padding:14px}.top{align-items:flex-start}.status{white-space:normal;max-width:145px}.grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}.word-cell{padding:11px}.symbol-stage img{max-width:130px}}
+  </style>
+</head>
+<body>
+<header>
+  <div class="wrap top">
+    <div><div class="eyebrow">SymbolQuran · Smart translator</div><h1>English → Blissymbolics</h1><p class="subtitle">Fast dictionary lookup with optional on-device semantic AI.</p></div>
+    <span class="status" id="status"><span class="dot"></span><span id="statusText">Loading vocabulary…</span></span>
+  </div>
+</header>
+<main class="wrap">
+  <section class="panel editor" aria-label="Translator">
+    <label for="inputEnglish" class="section-title" style="display:block">English words or sentences</label>
+    <textarea id="inputEnglish" spellcheck="true" placeholder="Try: Hi! Thank you. I walked home. I went to the bank."></textarea>
+    <div class="row" style="margin-top:12px">
+      <button class="button primary" id="translateButton" disabled>Translate</button>
+      <button class="button" id="clearButton">Clear</button>
+      <button class="button secondary" id="copyCodes" disabled>Copy Bliss IDs</button>
+      <button class="button" id="copyGlosses" disabled>Copy glosses</button>
+      <span class="hint" id="timing" aria-live="polite"></span>
+    </div>
+    <details class="utility"><summary>Translate numeric Bliss IDs (original mode)</summary>
+      <div class="inside"><label for="inputNumbers" class="section-title" style="display:block">Space-separated IDs</label><input type="text" id="inputNumbers" inputmode="numeric" placeholder="14702 17533 18042"><p class="hint">When this field is filled, numeric mode takes precedence, as in the original site.</p></div>
+    </details>
+    <details class="utility"><summary>Options · AI assistance · personal vocabulary</summary>
+      <div class="inside settings">
+        <div><label><input type="checkbox" id="autoTranslate" checked> Live translation as you type</label><p class="hint">Lookup stays in your browser. AI never runs automatically.</p></div>
+        <div><label><input type="checkbox" id="showComponents" checked> Show compositional breakdowns</label><p class="hint">Uses the existing <code>comp_dict.json</code> data.</p></div>
+        <div><label for="proxyUrl">Optional AI proxy URL (HTTPS only)</label><input id="proxyUrl" type="url" placeholder="https://your-worker.example/translate"><p class="hint">Never paste an API key. Only use a backend you control. Text is sent only when you press “Improve with AI”.</p></div>
+        <div><label>On-device semantic AI · WebGPU / CPU</label>
+          <p class="hint">Uses Transformers.js and MiniLM to understand approximate meanings. Inference runs on your device, not a paid API. The first preparation downloads model files and calculates an index of BCI concepts; this can be slow on phones. Later visits reuse browser storage when available.</p>
+          <div class="ai-prepare">
+            <div class="row"><button class="button small primary" id="prepareLocalAI" type="button" disabled>Download & prepare local AI</button><button class="button small" id="stopLocalAI" type="button" hidden>Unload / cancel</button></div>
+            <progress id="aiProgress" max="100" value="0" hidden aria-label="Local AI preparation"></progress>
+            <div id="localAIStatus" role="status" aria-live="polite">Optional · not loaded</div>
+          </div>
+          <button style="margin-top:10px" class="button small" id="forgetMappings">Clear saved choices</button>
+        </div>
+      </div>
+    </details>
+  </section>
+  <section aria-label="Translation results">
+    <div class="section-header">
+      <h2>Translation <span id="count" class="summary"></span></h2>
+      <div class="row"><button class="button secondary small" id="aiButton" disabled>✧ Suggest meanings with AI</button><span id="aiInfo"></span></div>
+    </div>
+    <div id="notice" aria-live="polite"></div>
+    <div id="output" class="grid" aria-live="polite"><div class="panel empty" style="grid-column:1/-1">Enter an English phrase to begin.</div></div>
+  </section>
+</main>
+<footer>
+  <div>Uses the existing <code>BCI-AV_SKOG_2024-10-30_ID_to_gloss_map.txt</code>, <code>bliss_svg_id/</code>, <code>def_dict.json</code>, <code>svg_dict.json</code>, and <code>comp_dict.json</code> from this repository. Normal lookup needs no external services. Optional local semantic AI downloads model/runtime files, then runs inference on-device; model and vector caches are subject to browser storage policies.</div>
+  <div style="margin-top:9px">Blissymbol resources are based on the Blissymbolics Communication International Authorized Vocabulary, licensed CC BY-SA 3.0. See the <a href="https://github.com/HalalBelel/symbolquran">project repository and attribution</a>. Suggested/AI matches must be reviewed before use in important communication.</div>
+</footer>
+<script>
+'use strict';
+/*
+ * Drop-in SymbolQuran index.html. Serve alongside the original repo files.
+ * Optional AI proxy contract (CORS permitted):
+ *   POST { text: string, items: [{index, text, candidates:[{code,gloss}]}] }
+ *   -> { choices: [{ index:number, gloss:string, code?:string }] }
+ * No browser-exposed API keys. All AI results are validated against the loaded BCI IDs
+ * and visibly labelled as suggestions, never as guaranteed translations.
+ */
+const BCI_FILE = 'BCI-AV_SKOG_2024-10-30_ID_to_gloss_map.txt';
+const UNKNOWN_CODE = '8485';
+const MAX_PHRASE_WORDS = 7;
+const $ = id => document.getElementById(id);
+const db = {
+  gloss: new Map(), ids: new Map(), compounds: new Map(), definitions: new Map(),
+  svg: {}, maxPhrase:1, allWords:[], byLength:new Map(), typoCache:new Map(),
+  personal:new Map(), sourceCount:0
+};
+let results = [], lastInput = '', mode = 'english', busyAI = false, lastRequest = 0;
+let localAIWorker = null, localAIWorkerURL = null, localAIReady = false, localAIPreparing = false;
+let localAIRpcId = 0, localAIRpcPending = new Map(), localAIBackend = '';
+let debounce;
+
+function norm(s) {
+  return String(s ?? '').normalize('NFKC').toLowerCase()
+    .replace(/[‘’]/g,"'").replace(/[‐‑‒–—_-]/g,' ')
+    .replace(/[^\p{L}\p{N}'\s]/gu,' ').replace(/\s+/g,' ').trim();
+}
+function tokensOf(text) { return (String(text).match(/[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu) || []).map(norm).filter(Boolean); }
+function splitGlosses(s) { // A comma inside parentheses is not a separator.
+  const out=[];let part='',depth=0;
+  for(const ch of String(s)) {
+    if(ch==='(') depth++;
+    if(ch===')') depth=Math.max(0,depth-1);
+    if(ch===',' && depth===0){out.push(part.trim());part='';}else part+=ch;
+  }
+  if(part.trim()) out.push(part.trim());
+  return out;
+}
+function stripGloss(raw) {
+  // Keep the original gloss separately: qualifiers are important for sense selection.
+  return norm(String(raw).replace(/-\([^)]*\)/g,'').replace(/\([^)]*\)/g,''));
+}
+function insertGloss(key, id, rank, origin='bci') {
+  if(!key || !db.ids.has(id)) return;
+  if(!db.gloss.has(key)) db.gloss.set(key,[]);
+  const a=db.gloss.get(key), old=a.find(v=>v.code===id);
+  if(old) { if(rank<old.rank){old.rank=rank;old.origin=origin;} }
+  else a.push({code:id,rank,origin});
+  const length=key.split(' ').length;
+  if(length>db.maxPhrase) db.maxPhrase=Math.min(MAX_PHRASE_WORDS,length);
+}
+function parseBCI(text) {
+  // First pass: collect all codes. Second pass: build a many-to-many gloss index.
+  const rows=[];
+  for(const line of text.split(/\r?\n/)) {
+    const tab=line.indexOf('\t'); if(tab<0)continue;
+    const id=line.slice(0,tab).trim(); if(!/^\d+$/.test(id))continue;
+    const glosses=splitGlosses(line.slice(tab+1)); if(!glosses.length)continue;
+    rows.push({id,glosses});
+    db.ids.set(id,{id,glosses,primary:stripGloss(glosses[0])||glosses[0],old:glosses.every(g=>/\(OLD\)/i.test(g))});
+  }
+  for(const row of rows) for(const raw of row.glosses) {
+    const key=stripGloss(raw); if(!key)continue;
+    const rank=/\(OLD\)/i.test(raw)?9:/\([^)]*\)/.test(raw)?2:0;
+    insertGloss(key,row.id,rank);
+  }
+  if(!rows.length) throw Error('BCI file contains no valid ID–gloss rows.');
+  db.sourceCount=rows.length;
+}
+function loadDefinitions(data) {
+  for(const [key,desc] of Object.entries(data||{})) {
+    for(const raw of splitGlosses(key)) {
+      const k=stripGloss(raw);
+      if(k && !db.definitions.has(k))db.definitions.set(k,String(desc));
+    }
+  }
+}
+function loadCompounds(data) {
+  for(const [keys,parts] of Object.entries(data||{})) {
+    if(!Array.isArray(parts))continue;
+    const values=parts.map(stripGloss).filter(Boolean).slice(0,14);
+    if(!values.length)continue;
+    for(const key of splitGlosses(keys)) {
+      const k=stripGloss(key);if(k && !db.compounds.has(k))db.compounds.set(k,values);
+    }
+  }
+}
+function loadSvgAliases(data) {
+  // svg_dict keys sometimes list alternative labels for one symbol. Only add a missing
+  // label when all known labels in that group point to exactly ONE non-OLD BCI ID.
+  db.svg=data||{};
+  for(const group of Object.keys(db.svg)) {
+    const labels=splitGlosses(group).map(stripGloss).filter(Boolean);
+    const codes=new Set();
+    for(const label of labels) for(const candidate of db.gloss.get(label)||[])
+      if(candidate.rank===0) codes.add(candidate.code);
+    if(codes.size!==1)continue;
+    const code=[...codes][0];
+    for(const label of labels) if(!db.gloss.has(label))insertGloss(label,code,5,'svg synonym');
+  }
+}
+function buildTypoIndex(){
+  // Only single words are considered for typo suggestions. No typo is auto-applied.
+  db.allWords=[...db.gloss.keys()].filter(k=>k.length>=3 && !k.includes(' '));
+  for(const w of db.allWords){ const n=w.length;if(!db.byLength.has(n))db.byLength.set(n,[]);db.byLength.get(n).push(w); }
+}
+function lookup(k) { return db.gloss.get(k)||[]; }
+function addAlias(pairs, value) { for(const p of pairs.split('|')) ALIASES[norm(p)] = norm(value); }
+const ALIASES=Object.create(null);
+[
+ ['hi|hiya|heya|hey there|gday|g day|yo|howdy','hello'],
+ ['hey','hello'], ['thx|thanx|ty|thank u|thankyou|cheers mate','thank you'],
+ ['pls|plz|plss','please'], ['ur','your'], ['u','you'], ['r','are'],
+ ['lol|lmao','laugh'], ['omg','surprised'], ['brb','return'],
+ ['loo|wc|restroom|lavatory|bath room','toilet'],
+ ['washroom','bathroom'], ['mum|mom|mumma|mama','mother'],
+ ['dad|daddy|papa','father'], ['kiddo|kid|youngster','child'],
+ ['kids','children'], ['tummy','stomach'], ['bike','bicycle'],
+ ['auto|automobile','car'], ['cellphone|mobile phone|smartphone','telephone'],
+ ['tv','television'], ['fridge','refrigerator'], ['couch','sofa'],
+ ['pic|photo|snapshot','photograph'], ['pics|photos','pictures'],
+ ['movie|film','cinema'], ['okay|ok|okey|okie','yes'],
+ ['nope|nah','no'], ['yep|yeah|yup|yess','yes'],
+ ['cannot|cant|can\'t','can not'], ['dont|don\'t','do not'],
+ ['wont|won\'t','will not'], ['isnt|isn\'t','is not'],
+ ['wasnt|wasn\'t','was not'], ['arent|aren\'t','are not'],
+ ['im|i\'m','i am'], ['youre|you\'re','you are'],
+ ['theyre|they\'re','they are'], ['weve|we\'ve','we have'],
+ ['ive|i\'ve','i have'], ['ill|i\'ll','i will'],
+ ['wanna','want'], ['gonna','going to'], ['gotta','have to'],
+ ['btw','by the way'], ['asap','quickly'], ['awesome','wonderful'],
+ ['superb','excellent'], ['yummy','delicious'], ['scaredy','afraid'],
+ ['sadly','sad'], ['happier','happy'], ['happiest','happy'],
+ ['colour','color'], ['favorite','favourite'], ['centre','center'],
+ ['theater','theatre'], ['grey','gray'], ['organize','organise']
+].forEach(([a,b])=>addAlias(a,b));
+const IRREGULAR = Object.freeze({
+  am:'be',is:'be',are:'be',was:'be',were:'be',been:'be',being:'be',
+  went:'go',gone:'go',came:'come',done:'do',did:'do',does:'do',
+  had:'have',has:'have',ate:'eat',eaten:'eat',drank:'drink',drunk:'drink',
+  saw:'see',seen:'see',took:'take',taken:'take',gave:'give',given:'give',
+  made:'make',bought:'buy',brought:'bring',thought:'think',taught:'teach',
+  felt:'feel',found:'find',ran:'run',swam:'swim',swum:'swim',
+  slept:'sleep',spoke:'speak',spoken:'speak',wrote:'write',written:'write',
+  got:'get',getting:'get',heard:'hear',knew:'know',known:'know',
+  left:'leave',lost:'lose',stood:'stand',sat:'sit',
+  children:'child',people:'person',men:'man',women:'woman',feet:'foot',
+  teeth:'tooth',mice:'mouse',geese:'goose',oxen:'ox',
+  better:'good',best:'good',worse:'bad',worst:'bad'
+});
+function lemmaForms(word) {
+  const a=[];const add=v=>{if(v && v!==word && !a.includes(v))a.push(v);};
+  if(IRREGULAR[word])add(IRREGULAR[word]);
+  if(word.length<4)return a;
+  if(word.endsWith('ies')&&word.length>4)add(word.slice(0,-3)+'y');
+  if(word.endsWith('ves')) {add(word.slice(0,-3)+'f');add(word.slice(0,-3)+'fe');}
+  if(word.endsWith('ing')&&word.length>5) {
+    const stem=word.slice(0,-3);add(stem);add(stem+'e');
+    if(stem.length>2 && stem.at(-1)===stem.at(-2))add(stem.slice(0,-1));
+  }
+  if(word.endsWith('ed')&&word.length>4){const stem=word.slice(0,-2);add(stem);add(stem+'e');if(stem.at(-1)===stem.at(-2))add(stem.slice(0,-1));}
+  if(word.endsWith('es')&&word.length>4){add(word.slice(0,-2));add(word.slice(0,-1));}
+  if(word.endsWith('s')&&!word.endsWith('ss')&&word.length>3)add(word.slice(0,-1));
+  if(word.endsWith('ly')&&word.length>5)add(word.slice(0,-2));
+  return a;
+}
+const CONTEXT_HINTS = {
+  bank: {
+    '12626':['money','cash','deposit','withdraw','account','loan','credit','savings','finance','card','dollar','pay'],
+    '12640':['river','water','lake','shore','stream','fishing','creek','coast','boat']
+  },
+  bat: {
+    '12635':['baseball','cricket','sport','hit','ball','game'],
+    '12636':['animal','cave','flying','night','mammal','wing']
+  },
+  watch: {
+    '18044':['wear','wrist','time','clock','buy','new'],
+    '18045':['look','see','movie','television','tv','film','screen','watching']
+  },
+  help: {
+    '14704':['need','ask','request','assistance','support'],
+    '14705':['please','can','could','would','me','him','her','them','you','us','helping','to']
+  }
+};
+function contextualOrder(key, options, fullTokens, start, count) {
+  const context=fullTokens.filter((_,i)=>i<start || i>=start+count);
+  return [...options].map(o=>{
+    let boost=0;
+    const hints=CONTEXT_HINTS[key]?.[o.code]||[];
+    for(const w of context) if(hints.includes(w))boost+=5;
+    return {...o,score:boost-o.rank};
+  }).sort((a,b)=>b.score-a.score || Number(a.code)-Number(b.code));
+}
+function fromKey(input, key, origin, context, start, n) {
+  const entries=lookup(key); if(!entries.length)return null;
+  const sorted=contextualOrder(key,entries,context,start,n);
+  // Do not discard ambiguity: any same-rank or contextually close candidates remain selectable.
+  const top=sorted[0];
+  const competing=sorted.some((v,i)=>i>0 && v.score>=top.score-1);
+  const status=competing?'ambiguous':(sorted.length>1 && sorted.some(o=>o.score<top.score)?'context':origin);
+  return {text:input,key,code:top.code,codes:[top.code],status,options:sorted.slice(0,9),source:origin,
+          needsAI:competing, confirmed:!competing, suggestion:false};
+}
+function findDirect(input, context, start, n){
+  const key=norm(input);
+  const personal=db.personal.get(key);
+  if(personal && db.ids.has(personal))return {text:input,key,code:personal,codes:[personal],status:'personal',options:[],source:'personal',needsAI:false,confirmed:true};
+  const exact=fromKey(input,key,'exact',context,start,n);if(exact)return exact;
+  const alias=ALIASES[key];
+  if(alias){ const aliased=fromKey(input,alias,'alias',context,start,n);if(aliased)return aliased; }
+  // Only single tokens should be inflected; do not alter already-valid phrases.
+  if(n===1) for(const form of lemmaForms(key)) {
+    const hit=fromKey(input,form,'inflection',context,start,n);if(hit)return hit;
+  }
+  return null;
+}
+function boundedDistance(a,b,max=2) { // Damerau-Levenshtein (adjacent transpose), bounded.
+  if(Math.abs(a.length-b.length)>max)return max+1;
+  const n=b.length, prev2=[],prev=Array.from({length:n+1},(_,i)=>i);let row;
+  for(let i=1;i<=a.length;i++) {
+    row=Array(n+1);row[0]=i;let min=row[0];
+    for(let j=1;j<=n;j++) {
+      row[j]=Math.min(prev[j]+1,row[j-1]+1,prev[j-1]+(a[i-1]!==b[j-1]));
+      if(i>1&&j>1&&a[i-1]===b[j-2]&&a[i-2]===b[j-1]&&prev2.length) row[j]=Math.min(row[j],prev2[j-2]+1);
+      min=Math.min(min,row[j]);
+    }
+    if(min>max)return max+1;
+    prev2.splice(0,prev2.length,...prev); // small words: inexpensive; cached per query
+    prev.splice(0,prev.length,...row);
+  }
+  return prev[n];
+}
+function typoSuggestions(word) {
+  if(db.typoCache.has(word))return db.typoCache.get(word);
+  if(word.length<4 || word.includes(' ') || /\d/.test(word))return [];
+  const max=word.length>=7?2:1;
+  const list=[];
+  for(let len=word.length-max;len<=word.length+max;len++)for(const k of db.byLength.get(len)||[]) {
+    // Safe candidate narrowing; no autofixes, so obscure typo variants may yield no suggestions.
+    if(k[0]!==word[0] && k[1]!==word[1])continue;
+    const d=boundedDistance(word,k,max);
+    if(d<=max)list.push({word:k,d,rank:Math.min(...lookup(k).map(x=>x.rank))});
+  }
+  list.sort((a,b)=>a.d-b.d||a.rank-b.rank||Math.abs(a.word.length-word.length)-Math.abs(b.word.length-word.length)||a.word.localeCompare(b.word));
+  const out=list.slice(0,5).map(v=>v.word);db.typoCache.set(word,out);return out;
+}
+function resolveText(text) {
+  const words=tokensOf(text), out=[];
+  for(let i=0;i<words.length;) {
+    let hit=null, length=1;
+    for(let n=Math.min(db.maxPhrase,MAX_PHRASE_WORDS,words.length-i);n>=1;n--) {
+      const phrase=words.slice(i,i+n).join(' ');
+      const attempt=findDirect(phrase,words,i,n);
+      if(attempt){hit=attempt;length=n;break;}
+    }
+    if(!hit) {
+      const k=words[i], expansion=ALIASES[k];
+      // For contractions like "don't" -> "do not", render a clearly marked
+      // multi-symbol approximation rather than silently dropping the negation.
+      if(expansion && expansion.includes(' ') && !lookup(expansion).length) {
+        const sub=expansion.split(' '), ids=sub.map(c=>lookup(c)?.[0]?.code);
+        if(ids.every(Boolean) && ids.length<=5)hit={text:k,key:k,code:null,codes:ids,status:'constructed',options:[],source:'alias expansion',needsAI:true,confirmed:false};
+      }
+      const components=db.compounds.get(k);
+      if(!hit && components && components.length>1) {
+        const ids=components.map(c=>lookup(c)?.[0]?.code).filter(Boolean);
+        if(ids.length===components.length && ids.length<=5) hit={text:k,key:k,code:null,codes:ids,status:'constructed',options:[],source:'components',needsAI:true,confirmed:false};
+      }
+      if(!hit)hit={text:k,key:k,code:null,codes:[],status:'unknown',options:[],source:'unknown',needsAI:true,confirmed:false,
+        suggestions:typoSuggestions(k)};
+    }
+    hit.text=words.slice(i,i+length).join(' ');hit.start=i;hit.end=i+length;hit.index=out.length;
+    out.push(hit);i+=length;
+  }
+  return out;
+}
+function idInfo(id) {return db.ids.get(String(id));}
+function description(key,code) {
+  const info=idInfo(code);
+  return db.definitions.get(key) || (info?.glosses||[]).map(stripGloss).map(k=>db.definitions.get(k)).find(Boolean) || '';
+}
+function create(tag, cls='', value='') {const el=document.createElement(tag);if(cls)el.className=cls;if(value!==undefined && value!=='')el.textContent=String(value);return el;}
+function append(parent,...els){els.filter(Boolean).forEach(e=>parent.append(e));return parent;}
+function symbolImage(id,alt) {
+  const img=create('img');img.src='bliss_svg_id/'+encodeURIComponent(id)+'.svg';img.alt=alt||'Bliss symbol '+id;img.loading='lazy';img.decoding='async';
+  img.onerror=()=>{img.replaceWith(create('span','missing-symbol','?'));};return img;
+}
+const BADGE={exact:'Exact',context:'Context',alias:'Synonym',inflection:'Grammar',personal:'Saved',ambiguous:'Choose meaning',constructed:'Approximate',unknown:'Unknown',ai:'AI suggestion',manual:'Chosen',numeric:'ID'};
+function setNotice(s,kind='') {
+  const n=$('notice');n.replaceChildren();if(s){const div=create('div',kind==='error'?'errorbox':'hint',s);div.style.marginBottom='12px';n.append(div);}
+}
+function detailBlock(label,text) {
+  const p=create('div','detail');const strong=create('strong','',label+' ');append(p,strong,document.createTextNode(String(text)));return p;
+}
+function breakdownDetails(key) {
+  if(!$('showComponents').checked)return null;
+  const components=db.compounds.get(key);if(!components?.length)return null;
+  const root=create('details','breakdown');root.append(create('summary','','How this symbol is composed'));
+  const wrap=create('div','pieces');
+  for(const component of components.slice(0,14)) {
+    const ids=lookup(component);const piece=create('div','piece');
+    if(ids.length)piece.append(symbolImage(ids[0].code,component));
+    piece.append(create('span','',component));wrap.append(piece);
+  }
+  root.append(wrap);return root;
+}
+function changeChoice(index,id,remember=false) {
+  const item=results[index];if(!item || !db.ids.has(id))return;
+  item.code=id;item.codes=[id];item.status='manual';item.key=idInfo(id).primary;
+  item.confirmed=true;item.needsAI=false; // Retain alternative senses so a choice can be changed.
+  if(remember){ db.personal.set(norm(item.text),id); try{localStorage.setItem('sq-personal-v1',JSON.stringify(Object.fromEntries(db.personal)));}catch{} }
+  renderResults();
+}
+function wordCard(item) {
+  const uncertain=['ambiguous','constructed','ai'].includes(item.status),unknown=item.status==='unknown';
+  const card=create('article','word-cell'+(uncertain?' uncertain':'')+(unknown?' unknown':''));
+  const top=create('div','cell-top');top.append(create('span','input-word',item.text));
+  top.append(create('span','pill'+(uncertain?' uncertain':'')+(unknown?' unknown':''),BADGE[item.status]||item.status));card.append(top);
+  const stage=create('div','symbol-stage');
+  if(!item.codes.length)stage.append(create('span','missing-symbol','?'));
+  else for(const code of item.codes){const p=create('div','part');p.append(symbolImage(code,'Bliss '+code));if(item.codes.length>1)p.append(create('small','',code));stage.append(p);}
+  card.append(stage);
+  const info=item.code?idInfo(item.code):null;
+  card.append(create('div','gloss',info?.primary||(item.status==='constructed'?'Component approximation':'No safe match')));
+  if(item.codes.length)card.append(detailBlock('Bliss ID'+(item.codes.length>1?'s:':':'),item.codes.join(' ')));
+  if(info) {
+    const syn=info.glosses.join(', ');card.append(detailBlock('BCI glosses:',syn.length>155?syn.slice(0,152)+'…':syn));
+    const def=description(item.key,item.code);
+    if(def) {const p=detailBlock('Definition:',def.length>220?def.slice(0,218)+'…':def);p.classList.add('definition');card.append(p);}
+  }
+  if(item.status==='unknown')card.append(create('div','inside-note',mode==='numeric'?'This ID is not present in the loaded BCI vocabulary.':'No matching Bliss ID. Similar spellings are suggestions, not translations.'));
+  if(item.status==='constructed')card.append(create('div','inside-note','These component symbols are an approximation, not a verified Bliss-word.'));
+  if(item.status==='ambiguous')card.append(create('div','inside-note','Several meanings share this gloss. Select the correct one.'));
+  if(item.status==='ai')card.append(create('div','inside-note','Suggested by AI using semantic similarity, not a verified translation. Tap “Use this meaning” only if correct.'));
+  if(item.status==='alias')card.append(create('div','inside-note','Matched via a curated synonym/alias.'));
+  if(item.status==='context')card.append(create('div','inside-note','Meaning selected using nearby context words; verify if important.'));
+  const choices=create('div','alternatives');
+  if(item.options?.length>1) {
+    for(const opt of item.options.filter(o=>o.code!==item.code).slice(0,4)) {
+      const target=idInfo(opt.code);const b=create('button','',target?.primary+' · '+opt.code);
+      b.type='button';b.title=target?.glosses.join(', ')||'';b.addEventListener('click',()=>changeChoice(item.index,opt.code));choices.append(b);
+    }
+  }
+  for(const suggestion of item.suggestions||[]) {
+    const matches=lookup(suggestion);for(const opt of matches.slice(0,1)) {
+      const b=create('button','',`Did you mean “${suggestion}”?`);b.type='button';
+      b.addEventListener('click',()=>changeChoice(item.index,opt.code));choices.append(b);
+    }
+  }
+  if(choices.children.length)card.append(choices);
+  if(item.code && (item.status==='ambiguous' || item.status==='ai')) {
+    const b=create('button','button small secondary','Use this meaning');
+    b.type='button';b.addEventListener('click',()=>changeChoice(item.index,item.code));card.append(b);
+  }
+  // Users can deliberately save an explicitly chosen word as a personal local mapping.
+  if(item.status==='manual' && !db.personal.has(norm(item.text))) {
+    const b=create('button','button small','Remember this choice');
+    b.type='button';b.addEventListener('click',()=>changeChoice(item.index,item.code,true));card.append(b);
+  }
+  const explain=breakdownDetails(item.key || info?.primary);
+  if(explain)card.append(explain);
+  return card;
+}
+function renderResults() {
+  const output=$('output');output.replaceChildren();
+  const confirmed=results.filter(i=>i.confirmed).length;
+  const uncertain=results.length-confirmed;
+  $('count').textContent=results.length?`· ${confirmed}/${results.length} resolved${uncertain?' · '+uncertain+' need review':''}`:'';
+  if(!results.length){ const e=create('div','panel empty','Enter an English phrase or Bliss IDs to begin.');e.style.gridColumn='1/-1';output.append(e); }
+  else for(const item of results)output.append(wordCard(item));
+  $('copyCodes').disabled=!results.length;
+  $('copyGlosses').disabled=!results.length;
+  $('aiButton').disabled=busyAI || mode!=='english' || !results.some(i=>i.needsAI) || !hasAI();
+}
+function numericResults(text) {
+  return text.trim().split(/[\s,;]+/).filter(Boolean).map((id,i)=>{
+    const info=idInfo(id);return {index:i,start:i,end:i+1,text:id,code:info?id:null,codes:info?[id]:[],key:info?.primary||id,
+      status:info?'numeric':'unknown',needsAI:false,confirmed:!!info,options:[],suggestions:[]};
+  });
+}
+function translate() {
+  if(!db.sourceCount)return;
+  const time=performance.now(), en=$('inputEnglish').value.trim(), ids=$('inputNumbers').value.trim();
+  mode=ids?'numeric':'english';lastInput=ids||en;
+  results=ids?numericResults(ids):(en?resolveText(en):[]);
+  if(mode==='numeric')setNotice('Numeric ID mode is active. Clear the numeric field to translate English.');
+  else setNotice('');
+  renderResults();$('timing').textContent=results.length?`${Math.max(1,Math.round(performance.now()-time))} ms lookup · local`:'';
+}
+function queuedTranslate() {clearTimeout(debounce);if($('autoTranslate').checked)debounce=setTimeout(translate,180);}
+async function copyOutput(kind) {
+  const content=results.map(x=>kind==='codes'?(x.codes.join(' ')||'[unknown]'):(idInfo(x.code)?.primary||'[unknown]')).join(' ');
+  try{await navigator.clipboard.writeText(content);$('timing').textContent='Copied to clipboard';}
+  catch {setNotice('Clipboard unavailable in this browser. Select and copy the text manually: '+content);}
+}
+function hasAI(){return localAIReady || !!globalThis.LanguageModel || /^https:\/\//i.test($('proxyUrl').value.trim());}
+function aiState() {
+  const local=localAIReady, builtin=!!globalThis.LanguageModel,
+    remote=/^https:\/\//i.test($('proxyUrl').value.trim());
+  $('aiInfo').textContent=local?'Local semantic AI ready · no API calls':
+    builtin?'Browser AI available · install local AI for vocabulary search':
+    remote?'Uses your AI proxy when requested':'Optional: prepare local AI to suggest meanings';
+  renderResults();
+}
+
+// Similar to Wayfarer's narration workers: lazy download, separate worker,
+// cache model weights via Transformers.js Cache API, cache BCI vectors via IndexedDB.
+// This is an embedding model, not an LLM. It ranks meanings; it does NOT invent new Bliss words.
+function semanticWorker(scope) {
+  'use strict';
+  const MODEL='Xenova/all-MiniLM-L6-v2';
+  const TRANSFORMERS_URL='https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';
+  const DB_NAME='symbolquran-semantic-v1', STORE='indices';
+  let extractor=null, backend='', dims=0, vectors=null, idList=[], indexKey='';
+  const send=(message)=>scope.postMessage(message);
+  async function openDB() {
+    return new Promise((resolve,reject)=>{
+      const req=indexedDB.open(DB_NAME,1);
+      req.onupgradeneeded=()=>req.result.createObjectStore(STORE);
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error||new Error('IndexedDB unavailable'));
+    });
+  }
+  async function readCache(key) {
+    try {const db=await openDB();const result=await new Promise((resolve,reject)=>{
+      const t=db.transaction(STORE,'readonly'),req=t.objectStore(STORE).get(key);
+      req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
+    });db.close();return result;}catch(_){return null;}
+  }
+  async function writeCache(key,value) {
+    try{const db=await openDB();await new Promise((resolve,reject)=>{
+      const t=db.transaction(STORE,'readwrite');t.objectStore(STORE).put(value,key);
+      t.oncomplete=()=>resolve();t.onerror=()=>reject(t.error);
+    });db.close();return true;}catch(_){return false;}
+  }
+  function checksum(rows) {
+    let h=2166136261;
+    for(const row of rows)for(const c of row.id+'|'+row.label+';'){
+      h^=c.charCodeAt(0);h=Math.imul(h,16777619);
+    }
+    return (h>>>0).toString(16);
+  }
+  async function initModel() {
+    send({kind:'progress',stage:'model',message:'Loading Transformers.js runtime…'});
+    const {pipeline,env}=await import(TRANSFORMERS_URL);
+    env.useBrowserCache=true;env.allowRemoteModels=true;
+    const useGPU=!!scope.navigator?.gpu;
+    if(useGPU){
+      try{
+        send({kind:'progress',stage:'model',message:'Downloading/opening MiniLM on WebGPU…'});
+        extractor=await pipeline('feature-extraction',MODEL,{device:'webgpu',dtype:'fp32',
+          progress_callback:p=>{if(p?.status==='progress'&&p.total>0)send({kind:'progress',stage:'model',message:'Model download '+Math.round(p.loaded*100/p.total)+'%'});}
+        });backend='WebGPU';
+      }catch(e){
+        send({kind:'progress',stage:'model',message:'WebGPU unavailable for this model. Trying CPU…'});
+        extractor=null;
+      }
+    }
+    if(!extractor){
+      send({kind:'progress',stage:'model',message:'Downloading/opening quantized MiniLM on CPU…'});
+      extractor=await pipeline('feature-extraction',MODEL,{device:'wasm',dtype:'q8',
+        progress_callback:p=>{if(p?.status==='progress'&&p.total>0)send({kind:'progress',stage:'model',message:'Model download '+Math.round(p.loaded*100/p.total)+'%'});}
+      });backend='CPU / WASM';
+    }
+    const sample=await extractor(['hello'],{pooling:'mean',normalize:true});
+    dims=sample.dims?.at(-1)||sample.data.length;
+    if(!(dims>32&&dims<=2048))throw Error('Unexpected embedding dimensions: '+dims);
+    send({kind:'progress',stage:'model',message:'MiniLM loaded on '+backend+' ('+dims+'D).'});
+  }
+  async function embed(texts) {
+    const output=await extractor(texts,{pooling:'mean',normalize:true});
+    if(output.data.length!==texts.length*dims)throw Error('Unexpected embedding batch shape.');
+    return output.data;
+  }
+  async function makeIndex(rows) {
+    indexKey='minilm-l6-3.8.1-v2:'+rows.length+':'+checksum(rows);
+    idList=rows.map(r=>r.id);
+    const existing=await readCache(indexKey);
+    let done=0;
+    if(existing && existing.dims===dims && existing.length===rows.length &&
+       existing.ids?.length===rows.length && existing.buffer?.byteLength===rows.length*dims*4) {
+      vectors=new Float32Array(existing.buffer);
+      done=Math.min(rows.length,Math.max(0,Number(existing.done)||0));
+      if(done===rows.length){send({kind:'progress',stage:'index',percent:100,message:'Loaded cached BCI semantic index.'});return;}
+      send({kind:'progress',stage:'index',percent:Math.round(done*100/rows.length),message:'Resuming cached BCI index ('+done+'/'+rows.length+')…'});
+    }else vectors=new Float32Array(rows.length*dims);
+    const BATCH=24,CHECKPOINT=480;
+    for(let i=done;i<rows.length;i+=BATCH){
+      const chunk=rows.slice(i,Math.min(rows.length,i+BATCH));
+      const data=await embed(chunk.map(r=>r.label));
+      vectors.set(data,i*dims);
+      done=i+chunk.length;
+      if(i===0 || done%96===0 || done===rows.length)
+        send({kind:'progress',stage:'index',percent:Math.round(done*100/rows.length),message:'Indexing BCI meanings '+done.toLocaleString()+'/'+rows.length.toLocaleString()+' · '+backend});
+      if(done%CHECKPOINT===0 || done===rows.length){
+        // Save occasional resumable checkpoints, rather than restarting long mobile builds.
+        await writeCache(indexKey,{dims,length:rows.length,done,ids:idList,buffer:vectors.buffer.slice(0)});
+      }
+    }
+  }
+  function cosine(row, query) {
+    let score=0;const at=row*dims;
+    for(let j=0;j<dims;j++)score+=vectors[at+j]*query[j];
+    return score;
+  }
+  async function suggest(payload) {
+    if(!vectors)throw Error('Prepare local semantic AI first.');
+    const jobs=(payload.items||[]).slice(0,12);
+    const queries=jobs.map(j=>{
+      // Embeddings compare approximate meanings, not grammatical truth conditions.
+      // Keep it focused on the expression; context is used only for ambiguous glosses.
+      if((j.candidates||[]).length>1) return 'Meaning of '+j.text+' in '+String(payload.text||'').slice(0,240);
+      return String(j.text||'').slice(0,120);
+    });
+    const all=queries.length?await embed(queries):new Float32Array();
+    const out=[];
+    for(let k=0;k<jobs.length;k++){
+      const job=jobs[k],q=all.subarray(k*dims,(k+1)*dims);
+      const restrict=job.candidates?.length>1 ? new Set(job.candidates.map(c=>c.code)) : null;
+      const top=[];
+      for(let i=0;i<idList.length;i++){
+        if(restrict&&!restrict.has(idList[i]))continue;
+        const score=cosine(i,q);
+        if(score < (restrict?.size>1 ? .20 : .31))continue;
+        if(top.length<5 || score>top[top.length-1].score){
+          const entry={code:idList[i],score};let pos=top.findIndex(x=>score>x.score);
+          if(pos<0)pos=top.length;top.splice(pos,0,entry);if(top.length>5)top.pop();
+        }
+      }
+      out.push({index:job.index,candidates:top});
+    }
+    return {suggestions:out};
+  }
+  let queue=Promise.resolve();
+  scope.onmessage=e=>{
+    const m=e.data||{};
+    queue=queue.then(async()=>{
+      try{
+        let result;
+        if(m.op==='init'){
+          await initModel();await makeIndex(m.rows||[]);
+          result={backend,concepts:idList.length};
+          send({kind:'ready',id:m.id,...result});
+        }else if(m.op==='suggest'){
+          result=await suggest(m.payload||{});
+          send({kind:'result',id:m.id,result});
+        }
+      }catch(error){send({kind:'error',id:m.id,message:String(error?.message||error)});}
+    });
+  };
+  send({kind:'boot'});
+}
+function localAIFeedback(text,percent=null){
+  $('localAIStatus').textContent=text;
+  const bar=$('aiProgress');bar.hidden=!localAIPreparing;
+  if(percent===null)bar.removeAttribute('value');else {bar.max=100;bar.value=percent;}
+}
+function stopLocalAI() {
+  if(localAIWorker)localAIWorker.terminate();localAIWorker=null;
+  if(localAIWorkerURL)URL.revokeObjectURL(localAIWorkerURL);localAIWorkerURL=null;
+  for(const p of localAIRpcPending.values())p.reject(new Error('Local AI unloaded.'));
+  localAIRpcPending.clear();localAIReady=false;localAIPreparing=false;localAIBackend='';
+  $('prepareLocalAI').disabled=false;$('prepareLocalAI').textContent='Download & prepare local AI';$('stopLocalAI').hidden=true;
+  localAIFeedback('Not loaded · cached model and semantic index are retained');aiState();
+}
+function localAIRpc(op,payload) {
+  if(!localAIWorker)return Promise.reject(new Error('Local AI has not been loaded.'));
+  const id=++localAIRpcId;
+  return new Promise((resolve,reject)=>{
+    localAIRpcPending.set(id,{resolve,reject});
+    try{localAIWorker.postMessage({id,op,...payload});}
+    catch(e){localAIRpcPending.delete(id);reject(e);}
+  });
+}
+async function prepareLocalAI() {
+  if(localAIReady||localAIPreparing||!db.sourceCount)return;
+  if(typeof Worker==='undefined') {localAIFeedback('This browser does not support background Workers.');return;}
+  localAIPreparing=true;$('prepareLocalAI').disabled=true;$('stopLocalAI').hidden=false;
+  localAIFeedback('Starting AI worker…');
+  try {
+    const source='('+semanticWorker.toString()+')(self);';
+    localAIWorkerURL=URL.createObjectURL(new Blob([source],{type:'text/javascript'}));
+    localAIWorker=new Worker(localAIWorkerURL,{type:'module',name:'SymbolQuran semantic AI'});
+    localAIWorker.onmessage=e=>{
+      const m=e.data||{};
+      if(m.kind==='progress')localAIFeedback(m.message,m.percent??null);
+      if(m.kind==='error'||m.kind==='result'||m.kind==='ready'){
+        const req=localAIRpcPending.get(m.id);if(!req)return;
+        localAIRpcPending.delete(m.id);
+        m.kind==='error'?req.reject(new Error(m.message||'AI worker error')):req.resolve(m.kind==='result'?m.result:m);
+      }
+    };
+    localAIWorker.onerror=e=>{
+      const msg=e.message||'Could not start the local AI runtime.';
+      for(const p of localAIRpcPending.values())p.reject(new Error(msg));
+      localAIRpcPending.clear();localAIFeedback(msg);
+    };
+    // One row per symbol, not every synonym. Exact aliases remain in the fast local index.
+    // This bounds vector storage (~10 MB for 6,500 × 384 float32) and lookup time.
+    const rows=[];
+    for(const info of db.ids.values()){
+      if(info.old || info.id===UNKNOWN_CODE)continue;
+      const glosses=[...new Set(info.glosses.map(stripGloss).filter(Boolean))].slice(0,4);
+      if(!glosses.length)continue;
+      rows.push({id:info.id,label:glosses.join('; ').slice(0,150)});
+    }
+    const r=await localAIRpc('init',{rows});
+    localAIReady=true;localAIBackend=r.backend;
+    localAIFeedback('Ready · '+r.concepts.toLocaleString()+' BCI meanings · '+r.backend+' · local inference',100);
+    $('prepareLocalAI').textContent='Local AI ready';aiState();
+  }catch(e){const message=e?.message||String(e);stopLocalAI();localAIFeedback('Could not prepare AI: '+message+' (ordinary lookup still works)');}
+  finally{localAIPreparing=false;$('aiProgress').hidden=true;}
+}
+function applyLocalAISuggestions(data, requestId) {
+  if(requestId!==lastRequest)return 0;
+  const allowed=new Set(aiItems().map(i=>i.index));let updated=0;
+  for(const proposal of (data?.suggestions||[])){
+    if(!allowed.has(proposal.index))continue;
+    const item=results[proposal.index];if(!item?.needsAI)continue;
+    const options=[];
+    for(const s of proposal.candidates||[]){
+      const id=String(s.code||''),info=idInfo(id);
+      if(!info||info.old||options.some(o=>o.code===id))continue;
+      options.push({code:id,rank:0,origin:'local semantic',score:Number(s.score)||0});
+    }
+    if(!options.length)continue;
+    // Never silently count an embedding similarity score as a confirmed translation.
+    item.code=options[0].code;item.codes=[options[0].code];item.key=idInfo(item.code).primary;
+    item.status='ai';item.needsAI=false;item.confirmed=false;
+    item.options=options;item.suggestions=[];updated++;
+  }
+  return updated;
+}
+function aiItems() {
+  return results.filter(i=>i.needsAI).slice(0,12).map(i=>({
+    index:i.index,text:i.text,
+    candidates:[...(i.options||[]).map(x=>({code:x.code,gloss:idInfo(x.code)?.primary})),
+      ...(i.suggestions||[]).flatMap(k=>lookup(k).slice(0,1).map(x=>({code:x.code,gloss:idInfo(x.code)?.primary})))].slice(0,10)
+  }));
+}
+function parseAI(s){if(typeof s==='object')return s;try{return JSON.parse(s);}catch{
+  const match=String(s).match(/\{[\s\S]*\}/);return match?JSON.parse(match[0]):{};
+}}
+async function browserAI(payload) {
+  const L=globalThis.LanguageModel;
+  if(!L)throw Error('Built-in browser AI is not supported.');
+  // Call create() before the first await: the Prompt API may require transient
+  // user activation from the Improve button, which can expire across awaits.
+  const session=await L.create({monitor(m){m.addEventListener('downloadprogress',e=>{$('aiInfo').textContent='Downloading on-device model: '+Math.round(e.loaded*100)+'%';});}});
+  try {
+    const prompt=`You are an English-to-Blissymbolics meaning resolver, NOT a spelling corrector.
+Given the entire sentence and unresolved/ambiguous expressions, return the best single COMMON ENGLISH canonical gloss for each expression. Prefer one of the supplied candidate glosses and codes if it is semantically correct in context; if no candidate fits, propose a simple English synonym (e.g. "loo" -> "toilet"). Do not fabricate numeric codes. If uncertain, omit the item. Respond ONLY in JSON with property choices, an array of {index,gloss,code}. Use code "" when you are unsure of a code. Interpret idioms in context. All proposed glosses will be validated locally.\n${JSON.stringify(payload)}`;
+    const schema={type:'object',properties:{choices:{type:'array',items:{type:'object',properties:{index:{type:'integer'},gloss:{type:'string'},code:{type:'string'}},required:['index','gloss','code']}}},required:['choices']};
+    return parseAI(await session.prompt(prompt,{responseConstraint:schema}));
+  } finally {session.destroy?.();}
+}
+async function proxyAI(payload) {
+  const url=$('proxyUrl').value.trim();if(!/^https:\/\//i.test(url))throw Error('Configure an HTTPS AI proxy first.');
+  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),12000);
+  try{
+    const r=await fetch(url,{method:'POST',mode:'cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal});
+    if(!r.ok)throw Error('AI proxy HTTP '+r.status);return await r.json();
+  } finally{clearTimeout(timeout);}
+}
+function applyAI(data, requestId) {
+  if(requestId!==lastRequest)return 0;
+  const proposals=Array.isArray(data?.choices)?data.choices:[],original=new Set(aiItems().map(x=>x.index));let applied=0;
+  for(const p of proposals) {
+    if(!Number.isInteger(p.index)||!original.has(p.index))continue;
+    const item=results[p.index];if(!item?.needsAI)continue;
+    const key=norm(p.gloss);let opts=lookup(key);
+    // The model can suggest a known gloss, but can't assert a novel ID without
+    // a matching gloss in the actual BCI index.
+    if(!opts.length)continue;
+    const id=String(p.code||'');
+    let selected=opts.find(o=>o.code===id);
+    if(!selected && opts.length===1)selected=opts[0];
+    if(!selected)continue; // ambiguous unanchored model assertion: ask user.
+    item.code=selected.code;item.codes=[selected.code];item.key=key;
+    item.status='ai';item.needsAI=false;item.confirmed=false;item.options=opts.filter(x=>x.code!==selected.code);
+    item.suggestions=[];applied++;
+  }
+  return applied;
+}
+async function improveWithAI() {
+  if(busyAI||mode!=='english'||!hasAI())return;
+  busyAI=true;lastRequest++;const requestId=lastRequest,sourceText=$('inputEnglish').value;
+  const payload={text:sourceText,items:aiItems(),lexicon:'BCI-AV 2024-10-30'};
+  renderResults();$('aiInfo').textContent='AI resolving uncertain words…';
+  try {
+    let data;
+    if(localAIReady){
+      data=await localAIRpc('suggest',{payload});
+      if(sourceText!==$('inputEnglish').value || mode!=='english')return;
+      const count=applyLocalAISuggestions(data,requestId);
+      $('aiInfo').textContent=count?`${count} on-device semantic suggestion(s) · tap to confirm`:'Local AI found no useful candidate';
+    }else{
+      if(globalThis.LanguageModel)try{data=await browserAI(payload);}catch(e){
+        if(/^https:\/\//i.test($('proxyUrl').value.trim()))data=await proxyAI(payload);else throw e;
+      } else data=await proxyAI(payload);
+      if(sourceText!==$('inputEnglish').value || mode!=='english')return;
+      const count=applyAI(data,requestId);$('aiInfo').textContent=count?`${count} AI suggestion(s) · verify before use`:'AI found no safely verifiable matches';
+    }
+  }catch(err){$('aiInfo').textContent='AI unavailable: '+(err.message||String(err));}
+  finally{busyAI=false;renderResults();}
+}
+async function load() {
+  const filenames=[BCI_FILE,'def_dict.json','comp_dict.json','svg_dict.json'];
+  const data=await Promise.allSettled(filenames.map(async f=>{
+    const response=await fetch(new URL(f,document.baseURI));if(!response.ok)throw Error(f+': HTTP '+response.status);
+    return f.endsWith('.json')?response.json():response.text();
+  }));
+  if(data[0].status!=='fulfilled')throw Error('Cannot load '+BCI_FILE+'. Host this HTML beside the original repository files on GitHub Pages or a local web server.');
+  parseBCI(data[0].value);
+  if(data[1].status==='fulfilled')loadDefinitions(data[1].value);
+  if(data[2].status==='fulfilled')loadCompounds(data[2].value);
+  if(data[3].status==='fulfilled')loadSvgAliases(data[3].value);
+  buildTypoIndex();
+  try {const o=JSON.parse(localStorage.getItem('sq-personal-v1')||'{}');
+    for(const [k,id] of Object.entries(o))if(db.ids.has(String(id)))db.personal.set(norm(k),String(id));
+  }catch{}
+  $('translateButton').disabled=false;
+  $('status').classList.add('ready');
+  $('statusText').textContent=`${db.ids.size.toLocaleString()} BCI symbols ready`;
+  $('prepareLocalAI').disabled=false;
+  const failed=filenames.slice(1).filter((_,i)=>data[i+1].status==='rejected');
+  if(failed.length)setNotice('Some optional dictionaries were unavailable: '+failed.join(', ')+'. Core BCI lookup still works.','error');
+  aiState();
+}
+$('translateButton').addEventListener('click',translate);
+$('inputEnglish').addEventListener('input',queuedTranslate);
+$('inputNumbers').addEventListener('input',queuedTranslate);
+$('inputEnglish').addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter')translate();});
+$('clearButton').addEventListener('click',()=>{$('inputEnglish').value='';$('inputNumbers').value='';results=[];translate();});
+$('copyCodes').addEventListener('click',()=>copyOutput('codes'));
+$('copyGlosses').addEventListener('click',()=>copyOutput('glosses'));
+$('showComponents').addEventListener('change',renderResults);
+$('aiButton').addEventListener('click',improveWithAI);
+$('prepareLocalAI').addEventListener('click',prepareLocalAI);
+$('stopLocalAI').addEventListener('click',stopLocalAI);
+$('proxyUrl').addEventListener('input',aiState);
+$('forgetMappings').addEventListener('click',()=>{db.personal.clear();try{localStorage.removeItem('sq-personal-v1');}catch{};translate();setNotice('Saved personal word choices cleared.');});
+load().catch(e=>{$('status').classList.add('error');$('statusText').textContent='Dictionary failed to load';setNotice(e.message,'error');console.error(e);});
+// Exposed for non-destructive console testing, with no access to remote services.
+window.SymbolQuranLookup={resolveText,lookup,lemmaForms,norm,splitGlosses,db};
+</script>
+</body>
+</html>
